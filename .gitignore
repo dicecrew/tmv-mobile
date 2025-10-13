@@ -100,3 +100,6 @@ yarn-error.*
 
 expo-env.d.ts
 # @end expo-cli
+
+# Proyecto Web (no incluir en el repositorio móvil)
+../tmv_front/

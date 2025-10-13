@@ -89,6 +89,80 @@ export const userService = {
       method: 'PUT',
       data: userData
     }),
+
+  // Eliminar usuario
+  deleteUser: (userId: string) =>
+    customInstance<any>({
+      url: `/api/Users/${userId}`,
+      method: 'DELETE'
+    }),
+};
+
+// ===== SERVICIOS DE ADMINISTRADOR =====
+export const adminService = {
+  // Crear administrador
+  createAdminUser: (adminData: any) =>
+    customInstance<any>({
+      url: '/api/Admin/create-admin-user',
+      method: 'POST',
+      data: adminData
+    }),
+
+  // Registrar números ganadores
+  registerWinningNumbers: (winningData: any) =>
+    customInstance<any>({
+      url: '/api/Admin/register-winning-numbers',
+      method: 'POST',
+      data: winningData
+    }),
+
+  // Obtener resumen de apuestas
+  getBetResumeSummary: (params?: any) =>
+    customInstance<any>({
+      url: '/api/Admin/betresume-summary',
+      method: 'GET',
+      params
+    }),
+
+  // Obtener historial de ingresos
+  getIncomesHistory: (params?: any) =>
+    customInstance<any>({
+      url: '/api/Admin/incomes-history',
+      method: 'GET',
+      params
+    }),
+
+  // Obtener estadísticas de apuestas
+  getBetsStatistics: (params?: any) =>
+    customInstance<any>({
+      url: '/api/Admin/bets-statistics',
+      method: 'GET',
+      params
+    }),
+
+  // Obtener estado de operación de números ganadores
+  getRegisterWinningNumbersStatus: (operationId: string) =>
+    customInstance<any>({
+      url: `/api/Admin/register-winning-numbers/status/${operationId}`,
+      method: 'GET'
+    }),
+};
+
+// ===== SERVICIOS DE TIPOS DE JUEGO =====
+export const playTypeService = {
+  // Obtener tipos de juego
+  getPlayTypes: () =>
+    customInstance<any>({
+      url: '/api/PlayType',
+      method: 'GET'
+    }),
+
+  // Obtener tipo de juego por ID
+  getPlayTypeById: (typeId: string) =>
+    customInstance<any>({
+      url: `/api/PlayType/${typeId}`,
+      method: 'GET'
+    }),
 };
 
 // ===== SERVICIOS DE APUESTAS =====
@@ -239,6 +313,30 @@ export const throwService = {
       url: `/api/Throw/${throwId}`,
       method: 'DELETE'
     }),
+
+  // Obtener tiradas válidas
+  getValidThrows: () =>
+    customInstance<any>({
+      url: '/api/Throw/valid-throws',
+      method: 'GET'
+    }),
+
+  // Obtener tiradas inactivas
+  getInactiveThrows: () =>
+    customInstance<any>({
+      url: '/api/Throw/inactive',
+      method: 'GET'
+    }),
+};
+
+// ===== SERVICIOS DE BET RESUME =====
+export const betResumeService = {
+  // Cerrar tirada
+  closeThrow: (throwId: string) =>
+    customInstance<any>({
+      url: `/api/BetResume/throw/${throwId}/close`,
+      method: 'PUT'
+    }),
 };
 
 // ===== SERVICIOS DE BOOKIES =====
@@ -254,6 +352,13 @@ export const bookieService = {
   getBookieById: (bookieId: string) =>
     customInstance<any>({
       url: `/api/Bookie/${bookieId}`,
+      method: 'GET'
+    }),
+
+  // Obtener usuarios de un bookie específico
+  getBookieUsers: (bookieId: string) =>
+    customInstance<any>({
+      url: `/api/Bookie/${bookieId}/users`,
       method: 'GET'
     }),
 
@@ -310,6 +415,21 @@ export const bookieService = {
       method: 'GET',
       params
     }),
+
+  // Obtener bookie por usuario ID
+  getBookieByUserId: (userId: string) =>
+    customInstance<any>({
+      url: `/api/Bookie/user/${userId}`,
+      method: 'GET'
+    }),
+
+  // Registrar apuesta de jugador (por bookie)
+  createBetPlay: (betPlayData: any) =>
+    customInstance<any>({
+      url: '/api/Bookie/bet-play',
+      method: 'POST',
+      data: betPlayData
+    }),
 };
 
 // ===== SERVICIOS DE ROLES =====
@@ -348,6 +468,110 @@ export const roleService = {
   deleteRole: (roleId: string) =>
     customInstance<any>({
       url: `/api/Roles/${roleId}`,
+      method: 'DELETE'
+    }),
+};
+
+// ===== SERVICIOS DE MOVIMIENTOS =====
+export const moveService = {
+  // Obtener movimientos
+  getMoves: () =>
+    customInstance<any>({
+      url: '/api/Move',
+      method: 'GET'
+    }),
+
+  // Obtener movimiento por ID
+  getMoveById: (moveId: string) =>
+    customInstance<any>({
+      url: `/api/Move/${moveId}`,
+      method: 'GET'
+    }),
+
+  // Crear movimiento
+  createMove: (moveData: any) =>
+    customInstance<any>({
+      url: '/api/Move',
+      method: 'POST',
+      data: moveData
+    }),
+
+  // Actualizar movimiento
+  updateMove: (moveId: string, moveData: any) =>
+    customInstance<any>({
+      url: `/api/Move/${moveId}`,
+      method: 'PUT',
+      data: moveData
+    }),
+
+  // Eliminar movimiento
+  deleteMove: (moveId: string) =>
+    customInstance<any>({
+      url: `/api/Move/${moveId}`,
+      method: 'DELETE'
+    }),
+};
+
+// ===== SERVICIOS DE REGISTROS DE INGRESOS =====
+export const incomesLogService = {
+  // Registrar ingreso/recaudación
+  incomeRegister: (incomeData: any) =>
+    customInstance<any>({
+      url: '/api/IncomesLog/income-register',
+      method: 'POST',
+      data: incomeData
+    }),
+
+  // Crear registro de ingreso
+  createIncomesLog: (incomeData: any) =>
+    customInstance<any>({
+      url: '/api/IncomesLog',
+      method: 'POST',
+      data: incomeData
+    }),
+
+  // Obtener registros de ingresos
+  getIncomesLog: () =>
+    customInstance<any>({
+      url: '/api/IncomesLog',
+      method: 'GET'
+    }),
+
+  // Obtener registro de ingreso por ID
+  getIncomesLogById: (incomeId: string) =>
+    customInstance<any>({
+      url: `/api/IncomesLog/${incomeId}`,
+      method: 'GET'
+    }),
+
+  // Obtener por rango de fechas
+  getIncomesLogDateRange: (params: { from: string; to: string }) =>
+    customInstance<any>({
+      url: '/api/IncomesLog/date-range',
+      method: 'GET',
+      params
+    }),
+
+  // Obtener por bookie y rango de fechas
+  getIncomesLogByBookieDateRange: (bookieId: string, params: { from: string; to: string }) =>
+    customInstance<any>({
+      url: `/api/IncomesLog/bookie/${bookieId}/date-range`,
+      method: 'GET',
+      params
+    }),
+
+  // Actualizar registro de ingreso
+  updateIncomesLog: (incomeId: string, incomeData: any) =>
+    customInstance<any>({
+      url: `/api/IncomesLog/${incomeId}`,
+      method: 'PUT',
+      data: incomeData
+    }),
+
+  // Eliminar registro de ingreso
+  deleteIncomesLog: (incomeId: string) =>
+    customInstance<any>({
+      url: `/api/IncomesLog/${incomeId}`,
       method: 'DELETE'
     }),
 };

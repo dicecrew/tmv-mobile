@@ -23,6 +23,7 @@ interface User {
   roleName: string;
   defaultLotteryId: string;
   defaultLotteryName: string;
+  bookieId?: string | null;
   isActive: boolean;
   createdAt: string;
 }

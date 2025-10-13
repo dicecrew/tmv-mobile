@@ -1,370 +1,353 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
-  TouchableOpacity,
   ScrollView,
-  Alert,
+  StyleSheet,
+  TouchableOpacity,
+  Image,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import styled from 'styled-components/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
-import { colors, theme } from '../styles/GlobalStyles';
-import TmvLogo from '../assets/tmv_app_thumbnail.png';
+import { colors, spacing, borderRadius, fontSize, fontWeight } from '../styles/GlobalStyles';
+import Toast from 'react-native-toast-message';
+import AdminDashboard from '../components/admin/AdminDashboard';
+import ListeroDashboard from '../components/listero/ListeroDashboard';
+import JugadorDashboard from '../components/jugador/JugadorDashboard';
 
-// Componentes styled
-const Container = styled(SafeAreaView)`
-  flex: 1;
-  background-color: ${colors.darkBackground};
-`;
-
-const Header = styled.View`
-  background-color: rgba(25, 25, 25, 0.9);
-  padding: ${theme.spacing.lg}px;
-  border-bottom-width: 1px;
-  border-bottom-color: ${colors.inputBorder};
-  flex-direction: row;
-  justify-content: space-between;
-  align-items: center;
-`;
-
-const HeaderLeft = styled.View`
-  flex: 1;
-  flex-direction: row;
-  align-items: center;
-  gap: ${theme.spacing.md}px;
-`;
-
-const HeaderLogo = styled.View`
-  width: 40px;
-  height: 40px;
-  background-color: ${colors.primaryGold};
-  border-radius: ${theme.borderRadius.sm}px;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-`;
-
-const HeaderLogoImage = styled.Image`
-  width: 100%;
-  height: 100%;
-  resize-mode: contain;
-`;
-
-const UserInfo = styled.View`
-  flex: 1;
-`;
-
-const WelcomeText = styled.Text`
-  color: ${colors.subtleGrey};
-  font-size: ${theme.fontSize.sm}px;
-  margin-bottom: 2px;
-`;
-
-const UserName = styled.Text`
-  color: ${colors.lightText};
-  font-size: ${theme.fontSize.lg}px;
-  font-weight: ${theme.fontWeight.semibold};
-`;
-
-const UserRole = styled.Text`
-  color: ${colors.primaryGold};
-  font-size: ${theme.fontSize.sm}px;
-  font-weight: ${theme.fontWeight.medium};
-  margin-top: 2px;
-`;
-
-const LogoutButton = styled(TouchableOpacity)`
-  padding: ${theme.spacing.sm}px;
-`;
-
-const Content = styled(ScrollView)`
-  flex: 1;
-  padding: ${theme.spacing.lg}px;
-`;
-
-const Section = styled.View`
-  margin-bottom: ${theme.spacing.xl}px;
-`;
-
-const SectionTitle = styled.Text`
-  color: ${colors.lightText};
-  font-size: ${theme.fontSize.xl}px;
-  font-weight: ${theme.fontWeight.bold};
-  margin-bottom: ${theme.spacing.md}px;
-`;
-
-const Card = styled.View`
-  background-color: rgba(25, 25, 25, 0.9);
-  border-radius: ${theme.borderRadius.lg}px;
-  padding: ${theme.spacing.lg}px;
-  margin-bottom: ${theme.spacing.md}px;
-  border: 1px solid ${colors.inputBorder};
-  ${theme.shadows.md};
-`;
-
-const CardTitle = styled.Text`
-  color: ${colors.primaryGold};
-  font-size: ${theme.fontSize.md}px;
-  font-weight: ${theme.fontWeight.semibold};
-  margin-bottom: ${theme.spacing.sm}px;
-`;
-
-const CardDescription = styled.Text`
-  color: ${colors.subtleGrey};
-  font-size: ${theme.fontSize.sm}px;
-  line-height: 20px;
-`;
-
-const QuickActions = styled.View`
-  flex-direction: row;
-  flex-wrap: wrap;
-  gap: ${theme.spacing.md}px;
-`;
-
-const ActionButtonContainer = styled(TouchableOpacity)<{ variant?: 'primary' | 'secondary' }>`
-  flex: 1;
-  min-width: 150px;
-  border-radius: ${theme.borderRadius.md}px;
-  ${theme.shadows.sm};
-`;
-
-const ActionButtonGradient = styled(LinearGradient)<{ variant?: 'primary' | 'secondary' }>`
-  padding: ${theme.spacing.lg}px;
-  border-radius: ${theme.borderRadius.md}px;
-  align-items: center;
-  gap: ${theme.spacing.sm}px;
-  border: 1px solid ${props => props.variant === 'primary' ? colors.primaryGold : colors.inputBorder};
-`;
-
-const ActionButtonText = styled.Text<{ variant?: 'primary' | 'secondary' }>`
-  color: ${props => props.variant === 'primary' ? colors.darkBackground : colors.lightText};
-  font-size: ${theme.fontSize.sm}px;
-  font-weight: ${theme.fontWeight.semibold};
-  text-align: center;
-`;
-
-const StatusCard = styled.View`
-  background-color: rgba(212, 175, 55, 0.1);
-  border: 1px solid ${colors.primaryGold};
-  border-radius: ${theme.borderRadius.md}px;
-  padding: ${theme.spacing.md}px;
-  flex-direction: row;
-  align-items: center;
-  gap: ${theme.spacing.sm}px;
-`;
-
-const StatusText = styled.Text`
-  color: ${colors.primaryGold};
-  font-size: ${theme.fontSize.sm}px;
-  font-weight: ${theme.fontWeight.medium};
-  flex: 1;
-`;
-
-const DashboardScreen: React.FC = () => {
+const DashboardScreen = ({ navigation }: any) => {
   const { user, logout } = useAuth();
+  const [showDropdown, setShowDropdown] = useState(false);
+  
+  // Determinar si es jugador (todos los roles usan el header compacto)
+  const isJugador = true;
 
   const handleLogout = async () => {
-    Alert.alert(
-      'Cerrar Sesión',
-      '¿Estás seguro de que quieres cerrar sesión?',
-      [
-        {
-          text: 'Cancelar',
-          style: 'cancel',
-        },
-        {
-          text: 'Cerrar Sesión',
-          style: 'destructive',
-          onPress: async () => {
-            await logout();
-          },
-        },
-      ]
-    );
+    setShowDropdown(false);
+    await logout();
+    Toast.show({
+      type: 'success',
+      text1: 'Sesión cerrada',
+      text2: 'Has cerrado sesión correctamente',
+      position: 'top',
+      topOffset: 60,
+    });
+    navigation.replace('Login');
   };
 
-  const getRoleSpecificContent = () => {
-    if (!user) return null;
-
-    switch (user.roleName.toLowerCase()) {
+  const renderDashboardContent = () => {
+    if (!user) {
+      return (
+        <View style={styles.centerContent}>
+          <Text style={styles.infoText}>
+            Por favor, inicia sesión para ver el contenido del dashboard.
+          </Text>
+        </View>
+      );
+    }
+    
+    const normalizedRoleName = user.roleName?.toLowerCase();
+    
+    switch (normalizedRoleName) {
+      case 'superadmin':
+      case 'administrator':
       case 'admin':
-        return (
-          <Section>
-            <SectionTitle>Panel de Administración</SectionTitle>
-            <Card>
-              <CardTitle>Gestión del Sistema</CardTitle>
-              <CardDescription>
-                Administra usuarios, loterías, y configuración del sistema.
-              </CardDescription>
-            </Card>
-            <QuickActions>
-              <ActionButtonContainer variant="primary">
-                <ActionButtonGradient
-                  variant="primary"
-                  colors={[colors.primaryGold, colors.primaryRed]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  locations={[0.4, 1]}
-                >
-                  <Ionicons name="people" size={24} color={colors.darkBackground} />
-                  <ActionButtonText variant="primary">Gestionar Usuarios</ActionButtonText>
-                </ActionButtonGradient>
-              </ActionButtonContainer>
-              <ActionButtonContainer variant="secondary">
-                <ActionButtonGradient
-                  variant="secondary"
-                  colors={[colors.inputBackground, colors.inputBackground]}
-                >
-                  <Ionicons name="settings" size={24} color={colors.lightText} />
-                  <ActionButtonText variant="secondary">Configuración</ActionButtonText>
-                </ActionButtonGradient>
-              </ActionButtonContainer>
-            </QuickActions>
-          </Section>
-        );
-      
+        return <AdminDashboard user={user} />;
+      case 'bookie':
       case 'listero':
-        return (
-          <Section>
-            <SectionTitle>Panel de Listero</SectionTitle>
-            <Card>
-              <CardTitle>Gestión de Apuestas</CardTitle>
-              <CardDescription>
-                Registra y valida apuestas de tus jugadores.
-              </CardDescription>
-            </Card>
-            <QuickActions>
-              <ActionButtonContainer variant="primary">
-                <ActionButtonGradient
-                  variant="primary"
-                  colors={[colors.primaryGold, colors.primaryRed]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  locations={[0.4, 1]}
-                >
-                  <Ionicons name="add-circle" size={24} color={colors.darkBackground} />
-                  <ActionButtonText variant="primary">Registrar Apuesta</ActionButtonText>
-                </ActionButtonGradient>
-              </ActionButtonContainer>
-              <ActionButtonContainer variant="secondary">
-                <ActionButtonGradient
-                  variant="secondary"
-                  colors={[colors.inputBackground, colors.inputBackground]}
-                >
-                  <Ionicons name="checkmark-circle" size={24} color={colors.lightText} />
-                  <ActionButtonText variant="secondary">Validar Apuestas</ActionButtonText>
-                </ActionButtonGradient>
-              </ActionButtonContainer>
-            </QuickActions>
-          </Section>
-        );
-      
+        return <ListeroDashboard />;
+      case 'user':
       case 'jugador':
-        return (
-          <Section>
-            <SectionTitle>Panel de Jugador</SectionTitle>
-            <Card>
-              <CardTitle>Mis Apuestas</CardTitle>
-              <CardDescription>
-                Revisa el historial y estado de tus apuestas.
-              </CardDescription>
-            </Card>
-            <QuickActions>
-              <ActionButtonContainer variant="primary">
-                <ActionButtonGradient
-                  variant="primary"
-                  colors={[colors.primaryGold, colors.primaryRed]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  locations={[0.4, 1]}
-                >
-                  <Ionicons name="game-controller" size={24} color={colors.darkBackground} />
-                  <ActionButtonText variant="primary">Nueva Apuesta</ActionButtonText>
-                </ActionButtonGradient>
-              </ActionButtonContainer>
-              <ActionButtonContainer variant="secondary">
-                <ActionButtonGradient
-                  variant="secondary"
-                  colors={[colors.inputBackground, colors.inputBackground]}
-                >
-                  <Ionicons name="time" size={24} color={colors.lightText} />
-                  <ActionButtonText variant="secondary">Historial</ActionButtonText>
-                </ActionButtonGradient>
-              </ActionButtonContainer>
-            </QuickActions>
-          </Section>
-        );
-      
+        return <JugadorDashboard />;
       default:
         return (
-          <Section>
-            <SectionTitle>Panel General</SectionTitle>
-            <Card>
-              <CardTitle>Bienvenido</CardTitle>
-              <CardDescription>
-                Accede a las funciones disponibles según tu rol.
-              </CardDescription>
-            </Card>
-          </Section>
+          <View style={styles.centerContent}>
+            <Text style={styles.infoText}>
+              Dashboard General - Rol: {user.roleName}
+            </Text>
+          </View>
         );
     }
   };
 
   return (
-    <Container>
-      <Header>
-        <HeaderLeft>
-          <HeaderLogo>
-            <HeaderLogoImage source={TmvLogo} />
-          </HeaderLogo>
-          <UserInfo>
-            <WelcomeText>Bienvenido</WelcomeText>
-            <UserName>{user?.firstName || 'Usuario'}</UserName>
-            <UserRole>{user?.roleName || 'Usuario'}</UserRole>
-          </UserInfo>
-        </HeaderLeft>
-        <LogoutButton onPress={handleLogout} activeOpacity={0.7}>
-          <Ionicons name="log-out" size={24} color={colors.subtleGrey} />
-        </LogoutButton>
-      </Header>
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
+      {/* Header */}
+      <LinearGradient
+        colors={['rgba(30, 30, 30, 0.98)', 'rgba(30, 30, 30, 0.95)']}
+        style={[styles.header, isJugador && styles.headerCompact]}
+      >
+        {/* Logo */}
+        <TouchableOpacity style={[styles.logoContainer, isJugador && styles.logoCompact]}>
+          <LinearGradient
+            colors={[colors.primaryGold, colors.primaryRed]}
+            style={styles.logoGradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+          >
+            <Image
+              source={require('../assets/tmv_app_thumbnail.png')}
+              style={styles.logoImage}
+              resizeMode="contain"
+            />
+          </LinearGradient>
+        </TouchableOpacity>
 
-      <Content>
-        <Section>
-          <StatusCard>
-            <Ionicons name="information-circle" size={20} color={colors.primaryGold} />
-            <StatusText>
-              Aplicación móvil TMV - Versión de desarrollo
-            </StatusText>
-          </StatusCard>
-        </Section>
+        {/* App Name */}
+        <View style={styles.appNameContainer}>
+          <Text style={[styles.appName, isJugador && styles.appNameCompact]}>
+            The Money Vice
+          </Text>
+        </View>
 
-        {getRoleSpecificContent()}
+        {/* User Info */}
+        <TouchableOpacity
+          style={[styles.userInfo, isJugador && styles.userInfoCompact]}
+          onPress={() => setShowDropdown(true)}
+        >
+          <LinearGradient
+            colors={[colors.primaryGold, colors.primaryRed]}
+            style={[styles.avatar, isJugador && styles.avatarCompact]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+          >
+            <Ionicons
+              name="person"
+              size={isJugador ? 20 : 24}
+              color={colors.darkBackground}
+            />
+          </LinearGradient>
+          <View style={styles.userDetails}>
+            <Text
+              style={[styles.userName, isJugador && styles.userNameCompact]}
+              numberOfLines={1}
+            >
+              {user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Usuario' : 'Invitado'}
+            </Text>
+            <View style={styles.roleContainer}>
+              <Ionicons
+                name="shield"
+                size={isJugador ? 12 : 16}
+                color={colors.primaryRed}
+              />
+              <Text style={[styles.userRole, isJugador && styles.userRoleCompact]}>
+                {user ? user.roleName : 'No disponible'}
+              </Text>
+            </View>
+          </View>
+        </TouchableOpacity>
+      </LinearGradient>
 
-        <Section>
-          <SectionTitle>Información del Sistema</SectionTitle>
-          <Card>
-            <CardTitle>Estado de Conexión</CardTitle>
-            <CardDescription>
-              {user?.id === 'mock-user-id' 
-                ? 'Modo offline - Usando datos de demostración'
-                : 'Conectado al servidor'
-              }
-            </CardDescription>
-          </Card>
-          
-          <Card>
-            <CardTitle>Lotería por Defecto</CardTitle>
-            <CardDescription>
-              {user?.defaultLotteryName || 'No configurada'}
-            </CardDescription>
-          </Card>
-        </Section>
-      </Content>
-    </Container>
+      {/* Main Content */}
+      <ScrollView style={styles.content}>
+        {renderDashboardContent()}
+      </ScrollView>
+
+      {/* Dropdown Modal */}
+      <Modal
+        visible={showDropdown}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowDropdown(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowDropdown(false)}
+        >
+          <View style={styles.dropdownContainer}>
+            <TouchableOpacity
+              style={styles.dropdownItem}
+              onPress={() => {
+                setShowDropdown(false);
+                // Navigate to edit profile
+              }}
+            >
+              <Ionicons name="create-outline" size={20} color={colors.lightText} />
+              <Text style={styles.dropdownText}>Editar Perfil</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={styles.dropdownItem}
+              onPress={() => {
+                setShowDropdown(false);
+                // Navigate to change password
+              }}
+            >
+              <Ionicons name="key-outline" size={20} color={colors.lightText} />
+              <Text style={styles.dropdownText}>Cambiar Contraseña</Text>
+            </TouchableOpacity>
+            
+            <View style={styles.dropdownDivider} />
+            
+            <TouchableOpacity
+              style={[styles.dropdownItem, styles.dropdownItemDanger]}
+              onPress={handleLogout}
+            >
+              <Ionicons name="log-out-outline" size={20} color={colors.primaryRed} />
+              <Text style={[styles.dropdownText, styles.dropdownTextDanger]}>
+                Cerrar Sesión
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      <Toast />
+    </SafeAreaView>
   );
 };
+
+const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: colors.darkBackground,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.inputBorder,
+  },
+  headerCompact: {
+    paddingVertical: spacing.md,
+  },
+  logoContainer: {
+    marginRight: spacing.md,
+  },
+  logoCompact: {
+    marginRight: spacing.sm,
+  },
+  logoGradient: {
+    width: 60,
+    height: 60,
+    borderRadius: borderRadius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  logoImage: {
+    width: '75%',
+    height: '75%',
+  },
+  appNameContainer: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  appName: {
+    fontSize: fontSize.xxl,
+    fontWeight: fontWeight.heavy,
+    color: colors.primaryGold,
+    letterSpacing: -1,
+  },
+  appNameCompact: {
+    fontSize: fontSize.xl,
+  },
+  userInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    padding: spacing.sm,
+    borderRadius: borderRadius.md,
+    backgroundColor: 'rgba(255, 255, 255, 0.02)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.05)',
+  },
+  userInfoCompact: {
+    padding: spacing.xs,
+  },
+  avatar: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarCompact: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+  },
+  userDetails: {
+    alignItems: 'flex-start',
+  },
+  userName: {
+    fontSize: fontSize.lg,
+    fontWeight: fontWeight.bold,
+    color: colors.primaryGold,
+  },
+  userNameCompact: {
+    fontSize: fontSize.md,
+  },
+  roleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  userRole: {
+    fontSize: fontSize.sm,
+    color: colors.subtleGrey,
+    fontWeight: fontWeight.medium,
+  },
+  userRoleCompact: {
+    fontSize: fontSize.xs,
+  },
+  content: {
+    flex: 1,
+  },
+  centerContent: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.xl,
+  },
+  infoText: {
+    fontSize: fontSize.md,
+    color: colors.lightText,
+    textAlign: 'center',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-start',
+    alignItems: 'flex-end',
+    paddingTop: 80,
+    paddingRight: spacing.lg,
+  },
+  dropdownContainer: {
+    backgroundColor: colors.inputBackground,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.inputBorder,
+    minWidth: 200,
+    overflow: 'hidden',
+  },
+  dropdownItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    padding: spacing.md,
+  },
+  dropdownItemDanger: {
+    backgroundColor: 'rgba(176, 0, 0, 0.1)',
+  },
+  dropdownText: {
+    fontSize: fontSize.md,
+    color: colors.lightText,
+    fontWeight: fontWeight.medium,
+  },
+  dropdownTextDanger: {
+    color: colors.primaryRed,
+  },
+  dropdownDivider: {
+    height: 1,
+    backgroundColor: colors.inputBorder,
+    marginVertical: spacing.xs,
+  },
+});
 
 export default DashboardScreen;
