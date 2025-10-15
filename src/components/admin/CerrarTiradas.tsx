@@ -8,11 +8,11 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
-import { Picker } from '@react-native-picker/picker';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors, spacing, borderRadius, fontSize, fontWeight } from '../../styles/GlobalStyles';
 import Card from '../common/Card';
+import Combobox, { ComboboxOption } from '../common/Combobox';
 import Toast from 'react-native-toast-message';
 import { throwService, betResumeService } from '../../api/services';
 
@@ -61,6 +61,13 @@ const CerrarTiradas: React.FC = () => {
   useEffect(() => {
     loadValidThrows();
   }, []);
+
+  // Convertir throws a opciones del combobox
+  const throwOptions: ComboboxOption[] = validThrows.map(throwItem => ({
+    id: throwItem.id,
+    label: `${throwItem.lotteryName?.toUpperCase()} - ${throwItem.name}`,
+    value: throwItem.id,
+  }));
 
   // Cerrar tirada
   const handleCloseDraw = () => {
@@ -136,32 +143,18 @@ const CerrarTiradas: React.FC = () => {
         </Text>
 
         <View style={styles.formGroup}>
-          <Text style={styles.label}>
-            <Ionicons name="megaphone-outline" size={16} color={colors.lightText} />  Seleccionar Tirada *
-          </Text>
-          <View style={styles.pickerContainer}>
-            <Picker
-              selectedValue={selectedThrowId}
-              onValueChange={(value) => setSelectedThrowId(value)}
-              style={styles.picker}
-              enabled={!isLoading && validThrows.length > 0}
-            >
-              <Picker.Item label="-- Seleccione una tirada --" value="" />
-              {isLoading && (
-                <Picker.Item label="Cargando tiradas..." value="" enabled={false} />
-              )}
-              {!isLoading && validThrows.length === 0 && (
-                <Picker.Item label="⚠️ No hay tiradas disponibles" value="" enabled={false} />
-              )}
-              {validThrows.map((throwItem) => (
-                <Picker.Item
-                  key={throwItem.id}
-                  label={`${throwItem.lotteryName?.toUpperCase()} - ${throwItem.name}`}
-                  value={throwItem.id}
-                />
-              ))}
-            </Picker>
-          </View>
+          <Combobox
+            options={throwOptions}
+            selectedValue={selectedThrowId}
+            onValueChange={setSelectedThrowId}
+            placeholder="-- Seleccione una tirada --"
+            loading={isLoading}
+            loadingText="Cargando tiradas..."
+            emptyText="⚠️ No hay tiradas disponibles"
+            enabled={!isLoading}
+            label="Seleccionar Tirada *"
+            icon="megaphone-outline"
+          />
         </View>
 
         <TouchableOpacity
@@ -207,24 +200,6 @@ const styles = StyleSheet.create({
   },
   formGroup: {
     marginBottom: spacing.lg,
-  },
-  label: {
-    fontSize: fontSize.sm,
-    fontWeight: fontWeight.semibold,
-    color: colors.lightText,
-    marginBottom: spacing.sm,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-  },
-  pickerContainer: {
-    backgroundColor: colors.darkBackground,
-    borderWidth: 2,
-    borderColor: colors.inputBorder,
-    borderRadius: borderRadius.md,
-  },
-  picker: {
-    color: colors.lightText,
   },
   submitButton: {
     borderRadius: borderRadius.md,

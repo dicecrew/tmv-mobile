@@ -8,7 +8,7 @@ import {
   ActivityIndicator,
   Platform,
 } from 'react-native';
-import { Picker } from '@react-native-picker/picker';
+import Combobox, { ComboboxOption } from '../common/Combobox';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -226,33 +226,30 @@ const VerMovimientos: React.FC = () => {
     return amount.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
   };
 
+  // Convertir listeros a opciones del combobox
+  const listeroOptions: ComboboxOption[] = listeros.map(listero => ({
+    id: listero.id,
+    label: `${listero.name}${listero.phone ? ` (${listero.phone})` : ''}`,
+    value: listero.id,
+  }));
+
   return (
     <View style={styles.container}>
       <Card title="Ver Jugadas y Movimientos" icon="list-outline" style={styles.card}>
         {/* Filtros */}
         <View style={styles.filtersSection}>
           <View style={styles.formGroup}>
-            <Text style={styles.label}>
-              <Ionicons name="people-outline" size={16} color={colors.lightText} /> Seleccionar Listero
-            </Text>
-            <View style={styles.pickerContainer}>
-              <Picker
-                selectedValue={selectedBookie}
-                onValueChange={setSelectedBookie}
-                style={styles.picker}
-                enabled={!isLoadingBookies}
-              >
-                <Picker.Item label="-- Todos los listeros --" value="" />
-                {isLoadingBookies && <Picker.Item label="Cargando..." value="" enabled={false} />}
-                {listeros.map((listero) => (
-                  <Picker.Item
-                    key={listero.id}
-                    label={`${listero.name}${listero.phone ? ` (${listero.phone})` : ''}`}
-                    value={listero.id}
-                  />
-                ))}
-              </Picker>
-            </View>
+            <Combobox
+              options={listeroOptions}
+              selectedValue={selectedBookie}
+              onValueChange={setSelectedBookie}
+              placeholder="-- Todos los listeros --"
+              loading={isLoadingBookies}
+              loadingText="Cargando..."
+              enabled={!isLoadingBookies}
+              label="Seleccionar Listero"
+              icon="people-outline"
+            />
           </View>
 
           <View style={styles.dateFilters}>
@@ -521,15 +518,6 @@ const styles = StyleSheet.create({
     fontWeight: fontWeight.semibold,
     color: colors.lightText,
     marginBottom: spacing.sm,
-  },
-  pickerContainer: {
-    backgroundColor: colors.darkBackground,
-    borderWidth: 2,
-    borderColor: colors.inputBorder,
-    borderRadius: borderRadius.md,
-  },
-  picker: {
-    color: colors.lightText,
   },
   dateFilters: {
     gap: spacing.md,

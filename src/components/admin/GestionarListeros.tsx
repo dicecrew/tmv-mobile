@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Picker } from '@react-native-picker/picker';
+import Combobox, { ComboboxOption } from '../common/Combobox';
 import { colors, spacing, borderRadius, fontSize, fontWeight } from '../../styles/GlobalStyles';
 import Card from '../common/Card';
 import Toast from 'react-native-toast-message';
@@ -173,6 +173,13 @@ const GestionarListeros: React.FC = () => {
 
     return { isValid: true, formatted: formattedPhone };
   };
+
+  // Convertir lotteries a opciones del combobox
+  const lotteryOptions: ComboboxOption[] = lotteries.map(lottery => ({
+    id: lottery.id,
+    label: lottery.name,
+    value: lottery.id,
+  }));
 
   // Crear listero
   const handleCreateListero = async () => {
@@ -590,24 +597,13 @@ const GestionarListeros: React.FC = () => {
               </View>
 
               <View style={styles.formGroup}>
-                <Text style={styles.label}>Lotería por Defecto</Text>
-                <View style={styles.pickerContainer}>
-                  <Picker
-                    selectedValue={createFormData.defaultLotteryId}
-                    onValueChange={(value) => setCreateFormData({ ...createFormData, defaultLotteryId: value })}
-                    style={styles.picker}
-                  >
-                    <Picker.Item label="Sin lotería por defecto" value="" color={colors.lightText} />
-                    {lotteries.map((lottery) => (
-                      <Picker.Item 
-                        key={lottery.id} 
-                        label={lottery.name} 
-                        value={lottery.id} 
-                        color={colors.lightText} 
-                      />
-                    ))}
-                  </Picker>
-                </View>
+                <Combobox
+                  options={lotteryOptions}
+                  selectedValue={createFormData.defaultLotteryId}
+                  onValueChange={(value) => setCreateFormData({ ...createFormData, defaultLotteryId: value })}
+                  placeholder="Sin lotería por defecto"
+                  label="Lotería por Defecto"
+                />
               </View>
 
               <View style={styles.formGroup}>
@@ -702,24 +698,13 @@ const GestionarListeros: React.FC = () => {
                 </View>
 
                 <View style={styles.formGroup}>
-                  <Text style={styles.label}>Lotería por Defecto</Text>
-                  <View style={styles.pickerContainer}>
-                    <Picker
-                      selectedValue={editFormData.defaultLotteryId}
-                      onValueChange={(value) => setEditFormData({ ...editFormData, defaultLotteryId: value })}
-                      style={styles.picker}
-                    >
-                      <Picker.Item label="Sin lotería por defecto" value="" color={colors.lightText} />
-                      {lotteries.map((lottery) => (
-                        <Picker.Item 
-                          key={lottery.id} 
-                          label={lottery.name} 
-                          value={lottery.id} 
-                          color={colors.lightText} 
-                        />
-                      ))}
-                    </Picker>
-                  </View>
+                  <Combobox
+                    options={lotteryOptions}
+                    selectedValue={editFormData.defaultLotteryId}
+                    onValueChange={(value) => setEditFormData({ ...editFormData, defaultLotteryId: value })}
+                    placeholder="Sin lotería por defecto"
+                    label="Lotería por Defecto"
+                  />
                 </View>
 
                 <View style={styles.formGroup}>
@@ -979,17 +964,6 @@ const styles = StyleSheet.create({
     right: 12,
     top: 12,
     padding: spacing.xs,
-  },
-  pickerContainer: {
-    backgroundColor: colors.darkBackground,
-    borderWidth: 2,
-    borderColor: colors.inputBorder,
-    borderRadius: borderRadius.md,
-    overflow: 'hidden',
-  },
-  picker: {
-    color: colors.lightText,
-    backgroundColor: colors.darkBackground,
   },
   submitButton: {
     borderRadius: borderRadius.md,

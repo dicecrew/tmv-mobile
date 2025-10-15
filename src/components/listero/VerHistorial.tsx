@@ -8,7 +8,7 @@ import {
   ActivityIndicator,
   Platform,
 } from 'react-native';
-import { Picker } from '@react-native-picker/picker';
+import Combobox, { ComboboxOption } from '../common/Combobox';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -280,6 +280,13 @@ const VerHistorial: React.FC = () => {
     }
   };
 
+  // Convertir players a opciones del combobox
+  const playerOptions: ComboboxOption[] = players.map(player => ({
+    id: player.id,
+    label: `${player.firstName} ${player.lastName || ''} (${player.phoneNumber})`,
+    value: player.id,
+  }));
+
   // Estado y color
   const getStatusColor = (status: string): string => {
     switch (status) {
@@ -371,30 +378,16 @@ const VerHistorial: React.FC = () => {
         {!showHistory && (
           <View style={styles.filtersSection}>
             <View style={styles.formGroup}>
-              <Text style={styles.label}>Jugador (Opcional)</Text>
-              <View style={styles.pickerContainer}>
-                <Picker
-                  selectedValue={selectedPlayer}
-                  onValueChange={(value) => setSelectedPlayer(value)}
-                  style={styles.picker}
-                  enabled={!isLoadingBookie && !isLoadingUsers && players.length > 0}
-                >
-                  <Picker.Item label="-- Todos los jugadores --" value="" />
-                  {isLoadingBookie && (
-                    <Picker.Item label="Cargando bookie..." value="" enabled={false} />
-                  )}
-                  {isLoadingUsers && (
-                    <Picker.Item label="Cargando jugadores..." value="" enabled={false} />
-                  )}
-                  {players.map((player) => (
-                    <Picker.Item
-                      key={player.id}
-                      label={`${player.firstName} ${player.lastName || ''} (${player.phoneNumber})`}
-                      value={player.id}
-                    />
-                  ))}
-                </Picker>
-              </View>
+              <Combobox
+                options={playerOptions}
+                selectedValue={selectedPlayer}
+                onValueChange={setSelectedPlayer}
+                placeholder="-- Todos los jugadores --"
+                loading={isLoadingBookie || isLoadingUsers}
+                loadingText={isLoadingBookie ? "Cargando bookie..." : "Cargando jugadores..."}
+                enabled={!isLoadingBookie && !isLoadingUsers}
+                label="Jugador (Opcional)"
+              />
             </View>
 
             <View style={styles.dateRow}>
@@ -636,15 +629,6 @@ const styles = StyleSheet.create({
     fontWeight: fontWeight.semibold,
     color: colors.lightText,
     marginBottom: spacing.sm,
-  },
-  pickerContainer: {
-    backgroundColor: colors.darkBackground,
-    borderWidth: 2,
-    borderColor: colors.inputBorder,
-    borderRadius: borderRadius.md,
-  },
-  picker: {
-    color: colors.lightText,
   },
   dateRow: {
     flexDirection: 'row',

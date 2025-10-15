@@ -7,7 +7,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
 } from 'react-native';
-import { Picker } from '@react-native-picker/picker';
+import Combobox, { ComboboxOption } from '../common/Combobox';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors, spacing, borderRadius, fontSize, fontWeight } from '../../styles/GlobalStyles';
@@ -121,6 +121,13 @@ const RealizarApuesta: React.FC = () => {
     second: '2-digit',
   });
 
+  // Convertir players a opciones del combobox
+  const playerOptions: ComboboxOption[] = players.map(player => ({
+    id: player.id,
+    label: `${player.firstName} ${player.lastName || ''} (${player.phoneNumber})`,
+    value: player.id,
+  }));
+
   if (showPlayerBetForm && selectedPlayerData) {
     return (
       <View style={styles.container}>
@@ -176,35 +183,18 @@ const RealizarApuesta: React.FC = () => {
         <Text style={styles.sectionTitle}>Paso 1: Seleccionar Jugador</Text>
 
         <View style={styles.formGroup}>
-          <Text style={styles.label}>
-            <Ionicons name="people-outline" size={16} color={colors.lightText} /> Lista de mis jugadores registrados:
-          </Text>
-          <View style={styles.pickerContainer}>
-            <Picker
-              selectedValue={selectedPlayer}
-              onValueChange={(value) => setSelectedPlayer(value)}
-              style={styles.picker}
-              enabled={!isLoadingBookie && !isLoadingUsers && players.length > 0}
-            >
-              <Picker.Item label="-- Seleccione un jugador --" value="" />
-              {isLoadingBookie && (
-                <Picker.Item label="Cargando información del bookie..." value="" enabled={false} />
-              )}
-              {isLoadingUsers && (
-                <Picker.Item label="Cargando jugadores..." value="" enabled={false} />
-              )}
-              {!isLoadingBookie && !isLoadingUsers && players.length === 0 && (
-                <Picker.Item label="No hay jugadores registrados" value="" enabled={false} />
-              )}
-              {players.map((player) => (
-                <Picker.Item
-                  key={player.id}
-                  label={`${player.firstName} ${player.lastName || ''} (${player.phoneNumber})`}
-                  value={player.id}
-                />
-              ))}
-            </Picker>
-          </View>
+          <Combobox
+            options={playerOptions}
+            selectedValue={selectedPlayer}
+            onValueChange={setSelectedPlayer}
+            placeholder="-- Seleccione un jugador --"
+            loading={isLoadingBookie || isLoadingUsers}
+            loadingText={isLoadingBookie ? "Cargando información del bookie..." : "Cargando jugadores..."}
+            emptyText="No hay jugadores registrados"
+            enabled={!isLoadingBookie && !isLoadingUsers}
+            label="Lista de mis jugadores registrados"
+            icon="people-outline"
+          />
         </View>
 
         {/* Información del jugador seleccionado */}
@@ -290,15 +280,6 @@ const styles = StyleSheet.create({
     fontWeight: fontWeight.semibold,
     color: colors.lightText,
     marginBottom: spacing.sm,
-  },
-  pickerContainer: {
-    backgroundColor: colors.darkBackground,
-    borderWidth: 2,
-    borderColor: colors.inputBorder,
-    borderRadius: borderRadius.md,
-  },
-  picker: {
-    color: colors.lightText,
   },
   playerInfoBox: {
     flexDirection: 'row',

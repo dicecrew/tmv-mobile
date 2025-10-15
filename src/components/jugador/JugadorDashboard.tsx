@@ -15,7 +15,7 @@ import AprendeAJugar from './AprendeAJugar';
 type TabKey = 'placeBet' | 'history' | 'rules';
 
 const JugadorDashboard: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<TabKey>('placeBet');
+  const [activeTab, setActiveTab] = useState<TabKey>('rules');
 
   const tabs: Array<{ key: TabKey; title: string; icon: keyof typeof Ionicons.glyphMap }> = [
     { key: 'placeBet', title: 'Registrar', icon: 'flash-outline' },
@@ -32,7 +32,7 @@ const JugadorDashboard: React.FC = () => {
       case 'rules':
         return <AprendeAJugar />;
       default:
-        return <RegistrarApuesta />;
+        return <AprendeAJugar />;
     }
   };
 

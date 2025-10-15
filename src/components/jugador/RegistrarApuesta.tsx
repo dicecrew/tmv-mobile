@@ -12,7 +12,7 @@ import {
   Platform,
   Dimensions,
 } from 'react-native';
-import { Picker } from '@react-native-picker/picker';
+import Combobox, { ComboboxOption } from '../common/Combobox';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors, spacing, borderRadius, fontSize, fontWeight } from '../../styles/GlobalStyles';
@@ -1291,6 +1291,19 @@ const RegistrarApuesta: React.FC = () => {
   const availableTypes = getAvailableTypes();
   const totalAmount = calculateTotalAmount();
 
+  // Convertir datos a opciones del combobox
+  const lotteryOptions: ComboboxOption[] = lotteries.map(lottery => ({
+    id: lottery.id,
+    label: lottery.name,
+    value: lottery.id,
+  }));
+
+  const throwOptions: ComboboxOption[] = throws.map(throwItem => ({
+    id: throwItem.id,
+    label: throwItem.name,
+    value: throwItem.id,
+  }));
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
@@ -1303,46 +1316,33 @@ const RegistrarApuesta: React.FC = () => {
           <View style={styles.headerContainer}>
             <View style={styles.selectorsContainer}>
               {/* Selector de Lotería */}
-              <View style={styles.pickerContainer}>
-                <Picker
-                  selectedValue={selectedLotteryId}
-                  onValueChange={(value) => {
-                    setSelectedLotteryId(value);
-                    setSelectedThrowId('');
-                  }}
-                  style={styles.picker}
-                  enabled={!isLoadingLotteries && lotteries.length > 0}
-                >
-                  <Picker.Item label="📊 Lotería" value="" />
-                  {isLoadingLotteries && (
-                    <Picker.Item label="🔄 Cargando..." value="" enabled={false} />
-                  )}
-                  {lotteries.map((lottery) => (
-                    <Picker.Item key={lottery.id} label={lottery.name} value={lottery.id} />
-                  ))}
-                </Picker>
-              </View>
+              <Combobox
+                options={lotteryOptions}
+                selectedValue={selectedLotteryId}
+                onValueChange={(value) => {
+                  setSelectedLotteryId(value);
+                  setSelectedThrowId('');
+                }}
+                placeholder="📊 Lotería"
+                loading={isLoadingLotteries}
+                loadingText="🔄 Cargando..."
+                emptyText="❌ No hay loterías disponibles"
+                enabled={!isLoadingLotteries}
+                style={styles.comboboxStyle}
+              />
               
               {/* Selector de Tirada */}
-              <View style={styles.pickerContainer}>
-                <Picker
-                  selectedValue={selectedThrowId}
-                  onValueChange={(value) => setSelectedThrowId(value)}
-                  style={styles.picker}
-                  enabled={!isLoadingThrows && throws.length > 0 && selectedLotteryId !== ''}
-                >
-                  <Picker.Item label="🎯 Tirada" value="" />
-                  {isLoadingThrows && (
-                    <Picker.Item label="🔄 Cargando..." value="" enabled={false} />
-                  )}
-                  {throws.length === 0 && selectedLotteryId && !isLoadingThrows && (
-                    <Picker.Item label="❌ No hay tiradas" value="" enabled={false} />
-                  )}
-                  {throws.map((throwItem) => (
-                    <Picker.Item key={throwItem.id} label={throwItem.name} value={throwItem.id} />
-                  ))}
-                </Picker>
-              </View>
+              <Combobox
+                options={throwOptions}
+                selectedValue={selectedThrowId}
+                onValueChange={setSelectedThrowId}
+                placeholder="🎯 Tirada"
+                loading={isLoadingThrows}
+                loadingText="🔄 Cargando..."
+                emptyText="❌ No hay tiradas disponibles"
+                enabled={!isLoadingThrows && selectedLotteryId !== ''}
+                style={styles.comboboxStyle}
+              />
 
               {/* Estado de tirada */}
               {throwStatus && (
@@ -1801,17 +1801,9 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     flexWrap: 'wrap',
   },
-  pickerContainer: {
-    backgroundColor: colors.darkBackground,
-    borderWidth: 2,
-    borderColor: colors.primaryGold,
-    borderRadius: borderRadius.sm,
-    minWidth: 100,
+  comboboxStyle: {
     flex: 1,
-  },
-  picker: {
-    color: colors.primaryGold,
-    fontSize: fontSize.xs,
+    minWidth: 100,
   },
   statusBadge: {
     paddingHorizontal: spacing.sm,
