@@ -12,10 +12,11 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Picker } from '@react-native-picker/picker';
 import { colors, spacing, borderRadius, fontSize, fontWeight } from '../../styles/GlobalStyles';
 import Card from '../common/Card';
 import Toast from 'react-native-toast-message';
-import { bookieService } from '../../api/services';
+import { bookieService, lotteryService } from '../../api/services';
 
 interface Listero {
   id: string;
@@ -26,6 +27,8 @@ interface Listero {
   pendingAmount: number;
   throwPercent: number;
   revenuePercent: number;
+  defaultLotteryId?: string | null;
+  defaultLotteryName?: string | null;
   status: string;
 }
 
@@ -38,6 +41,7 @@ interface CreateFormData {
   pool: string;
   throwPercent: string;
   revenuePercent: string;
+  defaultLotteryId: string;
 }
 
 interface EditFormData {
@@ -47,10 +51,12 @@ interface EditFormData {
   pendingAmount: number;
   throwPercent: number;
   revenuePercent: number;
+  defaultLotteryId: string;
 }
 
 const GestionarListeros: React.FC = () => {
   const [listeros, setListeros] = useState<Listero[]>([]);
+  const [lotteries, setLotteries] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -67,9 +73,28 @@ const GestionarListeros: React.FC = () => {
     pool: '',
     throwPercent: '',
     revenuePercent: '',
+    defaultLotteryId: '',
   });
 
   const [editFormData, setEditFormData] = useState<EditFormData | null>(null);
+
+  // Cargar loterías
+  const loadLotteries = async () => {
+    try {
+      const response = await lotteryService.getActiveLotteries();
+      let lotteriesArray: any[] = [];
+      
+      if (response.data && typeof response.data === 'object' && !Array.isArray(response.data)) {
+        lotteriesArray = Object.values(response.data);
+      } else if (Array.isArray(response.data)) {
+        lotteriesArray = response.data;
+      }
+      
+      setLotteries(lotteriesArray);
+    } catch (error) {
+      console.error('Error loading lotteries:', error);
+    }
+  };
 
   // Cargar listeros
   const loadListeros = async () => {
@@ -93,6 +118,8 @@ const GestionarListeros: React.FC = () => {
         pendingAmount: bookie.pool || 0,
         throwPercent: (bookie.throwPercent || 0.10) * 100,
         revenuePercent: (bookie.revenuePercent || 0.05) * 100,
+        defaultLotteryId: bookie.defaultLotteryId || null,
+        defaultLotteryName: bookie.defaultLotteryName || null,
         status: 'active',
       }));
       
@@ -113,6 +140,7 @@ const GestionarListeros: React.FC = () => {
 
   useEffect(() => {
     loadListeros();
+    loadLotteries();
   }, []);
 
   // Filtrar listeros
@@ -224,6 +252,7 @@ const GestionarListeros: React.FC = () => {
       `👤 Nombre: ${createFormData.firstName} ${createFormData.lastName}\n` +
       `🏷️ Apodo: ${createFormData.nickName || 'Sin apodo'}\n` +
       `📱 Teléfono: ${phoneValidation.formatted}\n` +
+      `🎯 Lotería por defecto: ${createFormData.defaultLotteryId ? (lotteries.find(l => l.id === createFormData.defaultLotteryId)?.name || 'N/A') : 'Sin lotería por defecto'}\n` +
       `💰 Fondo: $${parseInt(createFormData.pool || '0').toLocaleString()}\n` +
       `🎯 % Tiro: ${parseFloat(createFormData.throwPercent || '0')}%\n` +
       `💵 % Ingresos: ${parseFloat(createFormData.revenuePercent || '0')}%`,
@@ -240,7 +269,7 @@ const GestionarListeros: React.FC = () => {
                 nickName: createFormData.nickName.trim() || null,
                 phoneNumber: phoneValidation.formatted,
                 password: createFormData.password,
-                defaultLotteryId: null,
+                defaultLotteryId: createFormData.defaultLotteryId || null,
                 pool: 0,
                 throwPercent: parseFloat(createFormData.throwPercent || '0') / 100,
                 revenuePercent: parseFloat(createFormData.revenuePercent || '0') / 100,
@@ -266,6 +295,7 @@ const GestionarListeros: React.FC = () => {
                 pool: '',
                 throwPercent: '',
                 revenuePercent: '',
+                defaultLotteryId: '',
               });
               setShowCreateModal(false);
               loadListeros();
@@ -295,6 +325,7 @@ const GestionarListeros: React.FC = () => {
       pendingAmount: listero.pendingAmount,
       throwPercent: listero.throwPercent,
       revenuePercent: listero.revenuePercent,
+      defaultLotteryId: listero.defaultLotteryId || '',
     });
     setShowEditModal(true);
   };
@@ -307,6 +338,7 @@ const GestionarListeros: React.FC = () => {
     try {
       const updateData = {
         userId: editFormData.belongToUserId,
+        defaultLotteryId: editFormData.defaultLotteryId || null,
         pool: Number(editFormData.pendingAmount) || 0,
         throwPercent: Number(editFormData.throwPercent) / 100 || 0,
         revenuePercent: Number(editFormData.revenuePercent) / 100 || 0,
@@ -353,8 +385,8 @@ const GestionarListeros: React.FC = () => {
             try {
               await bookieService.deleteBookie(listero.id);
               
-              Toast.show({
-                type: 'success',
+            Toast.show({
+              type: 'success',
                 text1: '¡Éxito!',
                 text2: `Listero ${listero.name} eliminado`,
                 position: 'top',
@@ -368,9 +400,9 @@ const GestionarListeros: React.FC = () => {
                 type: 'error',
                 text1: 'Error',
                 text2: error.message || 'No se pudo eliminar el listero',
-                position: 'top',
-                topOffset: 60,
-              });
+              position: 'top',
+              topOffset: 60,
+            });
             }
           },
         },
@@ -479,13 +511,13 @@ const GestionarListeros: React.FC = () => {
             activeOpacity={1} 
             onPress={() => setShowCreateModal(false)}
           />
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Crear Nuevo Listero</Text>
-              <TouchableOpacity onPress={() => setShowCreateModal(false)}>
-                <Ionicons name="close-outline" size={28} color={colors.subtleGrey} />
-              </TouchableOpacity>
-            </View>
+        <View style={styles.modalContent}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Crear Nuevo Listero</Text>
+            <TouchableOpacity onPress={() => setShowCreateModal(false)}>
+              <Ionicons name="close-outline" size={28} color={colors.subtleGrey} />
+            </TouchableOpacity>
+          </View>
 
             <ScrollView>
               <View style={styles.formGroup}>
@@ -554,6 +586,27 @@ const GestionarListeros: React.FC = () => {
                       color={colors.subtleGrey}
                     />
                   </TouchableOpacity>
+                </View>
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={styles.label}>Lotería por Defecto</Text>
+                <View style={styles.pickerContainer}>
+                  <Picker
+                    selectedValue={createFormData.defaultLotteryId}
+                    onValueChange={(value) => setCreateFormData({ ...createFormData, defaultLotteryId: value })}
+                    style={styles.picker}
+                  >
+                    <Picker.Item label="Sin lotería por defecto" value="" color={colors.lightText} />
+                    {lotteries.map((lottery) => (
+                      <Picker.Item 
+                        key={lottery.id} 
+                        label={lottery.name} 
+                        value={lottery.id} 
+                        color={colors.lightText} 
+                      />
+                    ))}
+                  </Picker>
                 </View>
               </View>
 
@@ -646,6 +699,27 @@ const GestionarListeros: React.FC = () => {
                     value={editFormData.pendingAmount.toString()}
                     editable={false}
                   />
+                </View>
+
+                <View style={styles.formGroup}>
+                  <Text style={styles.label}>Lotería por Defecto</Text>
+                  <View style={styles.pickerContainer}>
+                    <Picker
+                      selectedValue={editFormData.defaultLotteryId}
+                      onValueChange={(value) => setEditFormData({ ...editFormData, defaultLotteryId: value })}
+                      style={styles.picker}
+                    >
+                      <Picker.Item label="Sin lotería por defecto" value="" color={colors.lightText} />
+                      {lotteries.map((lottery) => (
+                        <Picker.Item 
+                          key={lottery.id} 
+                          label={lottery.name} 
+                          value={lottery.id} 
+                          color={colors.lightText} 
+                        />
+                      ))}
+                    </Picker>
+                  </View>
                 </View>
 
                 <View style={styles.formGroup}>
@@ -905,6 +979,17 @@ const styles = StyleSheet.create({
     right: 12,
     top: 12,
     padding: spacing.xs,
+  },
+  pickerContainer: {
+    backgroundColor: colors.darkBackground,
+    borderWidth: 2,
+    borderColor: colors.inputBorder,
+    borderRadius: borderRadius.md,
+    overflow: 'hidden',
+  },
+  picker: {
+    color: colors.lightText,
+    backgroundColor: colors.darkBackground,
   },
   submitButton: {
     borderRadius: borderRadius.md,

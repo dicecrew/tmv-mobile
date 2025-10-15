@@ -199,10 +199,8 @@ const GestionarJugadores: React.FC = () => {
       };
     }
 
+    // Usar el número de teléfono limpio sin agregar prefijos automáticamente
     let formattedPhone = cleanPhone;
-    if (!formattedPhone.startsWith('+')) {
-      formattedPhone = `+1${formattedPhone}`;
-    }
 
     return { isValid: true, formatted: formattedPhone };
   };
