@@ -117,7 +117,7 @@ const LoginScreen = ({ navigation }: any) => {
                     placeholderTextColor={colors.subtleGrey}
                     value={phone}
                     onChangeText={setPhone}
-                    keyboardType="phone-pad"
+                    keyboardType="default"
                     autoCapitalize="none"
                     autoComplete="tel"
                     editable={!loading}
