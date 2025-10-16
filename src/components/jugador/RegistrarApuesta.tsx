@@ -63,6 +63,68 @@ const PLAY_TYPE_COLORS: { [key: string]: string } = {
   CENTENA: '#7c3aed',
 };
 
+// Componente de cuenta regresiva
+interface CountdownTimerProps {
+  endTime: string;
+  onTimeUp?: () => void;
+}
+
+const CountdownTimer: React.FC<CountdownTimerProps> = ({ endTime, onTimeUp }) => {
+  const [timeRemaining, setTimeRemaining] = useState<{
+    hours: number;
+    minutes: number;
+    seconds: number;
+    total: number;
+  }>({ hours: 0, minutes: 0, seconds: 0, total: 0 });
+
+  useEffect(() => {
+    const calculateTimeRemaining = () => {
+      try {
+        const now = new Date();
+        const end = new Date(endTime);
+        const difference = end.getTime() - now.getTime();
+
+        if (difference <= 0) {
+          setTimeRemaining({ hours: 0, minutes: 0, seconds: 0, total: 0 });
+          onTimeUp?.();
+          return;
+        }
+
+        const hours = Math.floor(difference / (1000 * 60 * 60));
+        const minutes = Math.floor((difference % (1000 * 60 * 60)) / (1000 * 60));
+        const seconds = Math.floor((difference % (1000 * 60)) / 1000);
+
+        setTimeRemaining({ hours, minutes, seconds, total: difference });
+      } catch (error) {
+        console.error('Error calculating time remaining:', error);
+      }
+    };
+
+    // Calcular inmediatamente
+    calculateTimeRemaining();
+
+    // Actualizar cada segundo
+    const interval = setInterval(calculateTimeRemaining, 1000);
+
+    return () => clearInterval(interval);
+  }, [endTime, onTimeUp]);
+
+  const formatTime = (value: number): string => {
+    return value.toString().padStart(2, '0');
+  };
+
+  // Si el tiempo se agotó, no mostrar nada
+  if (timeRemaining.total <= 0) {
+    return null;
+  }
+
+  return (
+    <Text style={styles.countdownText}>
+      ⏰ {formatTime(timeRemaining.hours)}:{formatTime(timeRemaining.minutes)}:{formatTime(timeRemaining.seconds)}
+    </Text>
+  );
+};
+
 // Función para formatear números con punto decimal
 const formatAmount = (amount: number): string => {
   if (amount === null || amount === undefined) return '0';
@@ -228,24 +290,43 @@ const RegistrarApuesta: React.FC = () => {
       const response = await lotteryService.getActiveLotteries();
 
       let lotteriesArray: any[] = [];
-      if (response && typeof response === 'object' && !Array.isArray(response)) {
-        lotteriesArray = Object.values(response);
-      } else if (response?.data && typeof response.data === 'object' && !Array.isArray(response.data)) {
-        lotteriesArray = Object.values(response.data);
-      } else if (Array.isArray(response?.data)) {
-        lotteriesArray = response.data;
-      } else if (Array.isArray(response)) {
+      
+      // Manejo robusto de diferentes formatos de respuesta (homologo al proyecto web)
+      if (response) {
+        if (Array.isArray(response)) {
         lotteriesArray = response;
+        } else if (response.data) {
+          if (Array.isArray(response.data)) {
+            lotteriesArray = response.data;
+          } else if (typeof response.data === 'object') {
+            lotteriesArray = Object.values(response.data);
+          }
+        } else if (typeof response === 'object') {
+          lotteriesArray = Object.values(response);
+        }
       }
 
-      setLotteries(lotteriesArray);
+      // Filtrar y validar datos antes de establecer
+      const validLotteries = lotteriesArray.filter(lottery => 
+        lottery && 
+        typeof lottery === 'object' && 
+        lottery.id && 
+        lottery.name &&
+        typeof lottery.id === 'string' &&
+        typeof lottery.name === 'string'
+      );
 
-      // Seleccionar primera lotería por defecto
-      if (lotteriesArray.length > 0 && !selectedLotteryId) {
-        setSelectedLotteryId(lotteriesArray[0].id);
+      console.log('🎯 Loterías cargadas:', validLotteries.length, validLotteries);
+      setLotteries(validLotteries);
+
+      // Seleccionar primera lotería por defecto solo si no hay selección previa y el usuario no tiene lotería por defecto
+      if (validLotteries.length > 0 && !selectedLotteryId && !user?.defaultLotteryId) {
+        setSelectedLotteryId(validLotteries[0].id);
+        console.log('🎯 Lotería por defecto seleccionada (primera disponible):', validLotteries[0].name);
       }
     } catch (error) {
-      console.error('Error loading lotteries:', error);
+      console.error('❌ Error loading lotteries:', error);
+      setLotteries([]); // Asegurar array vacío en caso de error
       Toast.show({
         type: 'error',
         text1: 'Error',
@@ -260,34 +341,117 @@ const RegistrarApuesta: React.FC = () => {
 
   // Cargar tiradas por lotería
   const loadThrows = async (lotteryId: string) => {
-    if (!lotteryId) return;
+    if (!lotteryId) {
+      setThrows([]);
+      setSelectedThrowId('');
+      return;
+    }
 
     setIsLoadingThrows(true);
     try {
-      const utcTime = new Date().toISOString();
-      const response = await throwService.getActiveThrowsByLotteryForTime(lotteryId, utcTime);
+      console.log('🔄 Cargando throws para lotería:', lotteryId);
+      
+      // Validar que el lotteryId sea válido
+      if (!lotteryId || typeof lotteryId !== 'string' || lotteryId.trim() === '') {
+        throw new Error('ID de lotería inválido');
+      }
+      
+      // Usar solo el endpoint correcto del proyecto web
+      console.log('🔄 Usando endpoint del proyecto web: /api/Throw/lottery/' + lotteryId + '/active');
+      const response = await throwService.getActiveThrowsByLottery(lotteryId);
+      console.log('✅ Throws cargados:', response);
 
       let throwsArray: any[] = [];
-      if (response?.data && Array.isArray(response.data)) {
-        throwsArray = response.data;
-      } else if (Array.isArray(response)) {
+      
+      // Manejo robusto de diferentes formatos de respuesta (homologo al proyecto web)
+      if (response) {
+        if (Array.isArray(response)) {
         throwsArray = response;
-      } else if (response?.data && typeof response.data === 'object') {
+        } else if (response.data) {
+          if (Array.isArray(response.data)) {
+            throwsArray = response.data;
+          } else if (typeof response.data === 'object') {
         throwsArray = Object.values(response.data);
+          }
+        } else if (typeof response === 'object') {
+          throwsArray = Object.values(response);
+        }
       }
 
-      setThrows(throwsArray);
+      // Filtrar y validar datos antes de establecer
+      const validThrows = throwsArray.filter(throwItem => 
+        throwItem && 
+        typeof throwItem === 'object' && 
+        throwItem.id && 
+        throwItem.name &&
+        typeof throwItem.id === 'string' &&
+        typeof throwItem.name === 'string'
+      );
 
-      // Seleccionar primera tirada por defecto
-      if (throwsArray.length > 0) {
-        setSelectedThrowId(throwsArray[0].id);
+      console.log('🎯 Tiradas cargadas para lotería', lotteryId, ':', validThrows.length, validThrows);
+      setThrows(validThrows);
+
+      // Siempre seleccionar la primera tirada activa (solo hay una tirada activa)
+      if (validThrows.length > 0) {
+        setSelectedThrowId(validThrows[0].id);
+        console.log('🎯 Tirada activa seleccionada automáticamente:', validThrows[0].name);
+        
+        // Mostrar mensaje informativo si se cargaron throws
+        Toast.show({
+          type: 'success',
+          text1: '✅ Tirada activa cargada',
+          text2: validThrows[0].name,
+          position: 'top',
+          topOffset: 60,
+          visibilityTime: 2000,
+        });
     } else {
         setSelectedThrowId('');
+        console.log('⚠️ No hay tiradas disponibles para esta lotería');
+        
+        // Mostrar mensaje informativo cuando no hay throws
+        Toast.show({
+          type: 'info',
+          text1: 'ℹ️ Sin tiradas',
+          text2: 'No hay tiradas activas para esta lotería',
+          position: 'top',
+          topOffset: 60,
+          visibilityTime: 3000,
+        });
       }
-    } catch (error) {
-      console.error('Error loading throws:', error);
+    } catch (error: any) {
+      console.error('❌ Error loading throws:', error);
+      
+      // Log detallado del error
+      if (error.response) {
+        console.error('❌ Error response:', {
+          status: error.response.status,
+          statusText: error.response.statusText,
+          data: error.response.data,
+          url: error.config?.url,
+          method: error.config?.method,
+          lotteryId: lotteryId
+        });
+      }
+      
       setThrows([]);
       setSelectedThrowId('');
+      
+      // Mostrar mensaje de error más específico
+      let errorMessage = 'No se pudieron cargar las tiradas';
+      if (error.response?.status === 404) {
+        errorMessage = 'No hay tiradas disponibles para esta lotería';
+      } else if (error.response?.status === 401) {
+        errorMessage = 'Sesión expirada. Por favor, inicia sesión nuevamente.';
+      }
+      
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: errorMessage,
+        position: 'top',
+        topOffset: 60,
+      });
     } finally {
       setIsLoadingThrows(false);
     }
@@ -300,17 +464,44 @@ const RegistrarApuesta: React.FC = () => {
       const response = await playTypeService.getPlayTypes();
 
       let typesArray: any[] = [];
-      if (response?.data && Array.isArray(response.data)) {
-        typesArray = response.data;
-      } else if (Array.isArray(response)) {
+      
+      // Manejo robusto de diferentes formatos de respuesta (homologo al proyecto web)
+      if (response) {
+        if (Array.isArray(response)) {
         typesArray = response;
-      } else if (response?.data && typeof response.data === 'object') {
+        } else if (response.data) {
+          if (Array.isArray(response.data)) {
+            typesArray = response.data;
+          } else if (typeof response.data === 'object') {
         typesArray = Object.values(response.data);
+          }
+        } else if (typeof response === 'object') {
+          typesArray = Object.values(response);
+        }
       }
 
-      setPlayTypes(typesArray);
+      // Filtrar y validar datos antes de establecer
+      const validTypes = typesArray.filter(type => 
+        type && 
+        typeof type === 'object' && 
+        type.id && 
+        type.name &&
+        typeof type.id === 'string' &&
+        typeof type.name === 'string'
+      );
+
+      console.log('🎯 Tipos de juego cargados:', validTypes.length, validTypes);
+      setPlayTypes(validTypes);
     } catch (error) {
-      console.error('Error loading play types:', error);
+      console.error('❌ Error loading play types:', error);
+      setPlayTypes([]); // Asegurar array vacío en caso de error
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'No se pudieron cargar los tipos de juego',
+        position: 'top',
+        topOffset: 60,
+      });
     } finally {
       setIsLoadingPlayTypes(false);
     }
@@ -472,6 +663,15 @@ const RegistrarApuesta: React.FC = () => {
   };
 
   const hasValidAmounts = (): boolean => {
+    // Verificar que haya al menos una jugada
+    const hasCurrentPlay = currentNumbers && selectedTypes.length > 0 && calculateCurrentAmount() > 0;
+    const hasSeparatedPlays = allPlays.length > 0;
+    
+    if (!hasCurrentPlay && !hasSeparatedPlays) {
+      return false;
+    }
+    
+    // Verificar jugadas separadas
     for (const play of allPlays) {
       for (const validPlay of play.validPlays) {
         if (validPlay.totalCost <= 0) {
@@ -480,7 +680,8 @@ const RegistrarApuesta: React.FC = () => {
       }
     }
     
-    if (currentNumbers && selectedTypes.length > 0) {
+    // Verificar jugada actual
+    if (hasCurrentPlay) {
       const validPlays = getValidPlays();
       for (const validPlay of validPlays) {
         if (validPlay.totalCost <= 0) {
@@ -492,10 +693,72 @@ const RegistrarApuesta: React.FC = () => {
     return true;
   };
 
+  const canSendBet = (): boolean => {
+    // Verificar que haya una tirada activa seleccionada
+    if (!selectedThrowId || throws.length === 0) {
+      return false;
+    }
+    
+    // Verificar que la tirada no esté cerrada
+    if (throwStatus?.status === 'closed') {
+      return false;
+    }
+    
+    // Verificar que haya jugadas válidas
+    if (!hasValidAmounts()) {
+      return false;
+    }
+    
+    // Verificar que no esté enviando
+    if (isSending) {
+      return false;
+    }
+    
+    return true;
+  };
+
   useEffect(() => {
-    loadActiveLotteries();
-    loadPlayTypes();
-  }, []);
+    // Cargar datos iniciales de manera secuencial para mejor control
+    const initializeData = async () => {
+      console.log('🚀 Inicializando datos del componente...');
+      try {
+        // Cargar tipos de juego primero
+        await loadPlayTypes();
+        
+        // Cargar loterías
+        await loadActiveLotteries();
+        
+        // Si el usuario tiene lotería por defecto, usarla
+        if (user?.defaultLotteryId) {
+          console.log('🎯 Usando lotería por defecto del usuario:', user.defaultLotteryId, user.defaultLotteryName);
+          
+          // Verificar que la lotería por defecto esté en la lista de loterías activas
+          const isDefaultLotteryAvailable = lotteries.some(lottery => lottery.id === user.defaultLotteryId);
+          
+          if (isDefaultLotteryAvailable) {
+            setSelectedLotteryId(user.defaultLotteryId);
+            console.log('✅ Lotería por defecto del usuario está disponible');
+            
+            // Cargar throws de la lotería por defecto
+            await loadThrows(user.defaultLotteryId);
+          } else {
+            console.warn('⚠️ Lotería por defecto del usuario no está disponible en las loterías activas');
+            // Si no está disponible, seleccionar la primera disponible
+            if (lotteries.length > 0) {
+              setSelectedLotteryId(lotteries[0].id);
+              await loadThrows(lotteries[0].id);
+            }
+          }
+        }
+        
+        console.log('✅ Datos inicializados correctamente');
+      } catch (error) {
+        console.error('❌ Error inicializando datos:', error);
+      }
+    };
+
+    initializeData();
+  }, [user]); // Agregar user como dependencia
 
   useEffect(() => {
     if (selectedLotteryId) {
@@ -1265,13 +1528,26 @@ const RegistrarApuesta: React.FC = () => {
     );
   };
 
-  // Estado de tirada
+  // Estado de tirada con validación robusta
   const throwStatus = useMemo(() => {
-    const selectedThrow = throws.find((t) => t.id === selectedThrowId);
-    if (!selectedThrow) return null;
+    if (!Array.isArray(throws) || throws.length === 0) {
+      return null;
+    }
 
+    const activeThrow = throws[0]; // Siempre usar la primera tirada (tirada activa)
+    if (!activeThrow || !activeThrow.endTime) {
+      return null;
+    }
+
+    try {
     const now = currentTime;
-    const endTime = new Date(selectedThrow.endTime);
+      const endTime = new Date(activeThrow.endTime);
+
+      // Validar que la fecha sea válida
+      if (isNaN(endTime.getTime())) {
+        console.warn('⚠️ Fecha de fin de tirada inválida:', activeThrow.endTime);
+        return { status: 'error', color: '#ef4444', text: 'Fecha inválida' };
+      }
 
     if (endTime <= now) {
       return { status: 'closed', color: '#ef4444', text: 'Cerrada' };
@@ -1279,30 +1555,34 @@ const RegistrarApuesta: React.FC = () => {
 
     const minutesRemaining = Math.floor((endTime.getTime() - now.getTime()) / (1000 * 60));
 
-    if (minutesRemaining <= 30) {
-      return { status: 'urgent', color: '#ef4444', text: `Cierra en ${minutesRemaining}min` };
+      if (minutesRemaining <= 5) {
+        return { status: 'critical', color: '#dc2626', text: 'Cierra en 5min' };
+      } else if (minutesRemaining <= 15) {
+        return { status: 'urgent', color: '#ef4444', text: 'Cierra en 15min' };
+      } else if (minutesRemaining <= 30) {
+        return { status: 'urgent', color: '#f97316', text: 'Cierra en 30min' };
     } else if (minutesRemaining <= 60) {
-      return { status: 'warning', color: '#f59e0b', text: `Cierra en ${minutesRemaining}min` };
+        return { status: 'warning', color: '#f59e0b', text: 'Cierra en 1h' };
     }
 
     return { status: 'normal', color: '#22c55e', text: 'Abierta' };
-  }, [throws, selectedThrowId, currentTime]);
+    } catch (error) {
+      console.error('❌ Error calculando estado de tirada:', error);
+      return { status: 'error', color: '#ef4444', text: 'Error de estado' };
+    }
+  }, [throws, currentTime]);
 
   const availableTypes = getAvailableTypes();
   const totalAmount = calculateTotalAmount();
 
-  // Convertir datos a opciones del combobox
-  const lotteryOptions: ComboboxOption[] = lotteries.map(lottery => ({
-    id: lottery.id,
-    label: lottery.name,
-    value: lottery.id,
-  }));
-
-  const throwOptions: ComboboxOption[] = throws.map(throwItem => ({
-    id: throwItem.id,
-    label: throwItem.name,
-    value: throwItem.id,
-  }));
+  // Convertir datos de loterías a opciones del combobox con validación robusta
+  const lotteryOptions: ComboboxOption[] = (Array.isArray(lotteries) ? lotteries : [])
+    .filter(lottery => lottery && typeof lottery === 'object' && lottery.id && lottery.name)
+    .map(lottery => ({
+      id: lottery.id,
+      label: lottery.name,
+      value: lottery.id,
+    }));
 
   return (
     <KeyboardAvoidingView
@@ -1316,53 +1596,79 @@ const RegistrarApuesta: React.FC = () => {
           <View style={styles.headerContainer}>
             <View style={styles.selectorsContainer}>
               {/* Selector de Lotería */}
-              <Combobox
-                options={lotteryOptions}
-                selectedValue={selectedLotteryId}
-                onValueChange={(value) => {
-                  setSelectedLotteryId(value);
-                  setSelectedThrowId('');
-                }}
-                placeholder="📊 Lotería"
-                loading={isLoadingLotteries}
-                loadingText="🔄 Cargando..."
-                emptyText="❌ No hay loterías disponibles"
-                enabled={!isLoadingLotteries}
-                style={styles.comboboxStyle}
-              />
+              <View style={styles.lotterySelectorContainer}>
+                <Combobox
+                  options={lotteryOptions}
+                  selectedValue={selectedLotteryId}
+                  onValueChange={(value) => {
+                    console.log('🎯 Lotería seleccionada:', value);
+                    setSelectedLotteryId(value);
+                    setSelectedThrowId(''); // Limpiar tirada al cambiar lotería
+                  }}
+                  placeholder="📊 Lotería"
+                  loading={isLoadingLotteries}
+                  loadingText="🔄 Cargando loterías..."
+                  emptyText="❌ No hay loterías disponibles"
+                  enabled={!isLoadingLotteries && lotteryOptions.length > 0}
+                  style={styles.comboboxStyle}
+                />
+              </View>
               
-              {/* Selector de Tirada */}
-              <Combobox
-                options={throwOptions}
-                selectedValue={selectedThrowId}
-                onValueChange={setSelectedThrowId}
-                placeholder="🎯 Tirada"
-                loading={isLoadingThrows}
-                loadingText="🔄 Cargando..."
-                emptyText="❌ No hay tiradas disponibles"
-                enabled={!isLoadingThrows && selectedLotteryId !== ''}
-                style={styles.comboboxStyle}
-              />
+              {/* Información de Tirada Activa */}
+              <View style={styles.throwInfoContainer}>
+                {selectedLotteryId && throws.length > 0 ? (
+                  <View style={styles.activeThrowContainer}>
+                    <Text style={styles.throwName}>
+                      🎯 {throws[0].name}
+                    </Text>
+                    {throws[0].endTime && (
+                      <Text style={styles.throwEndTime}>
+                        Cierra: {convertUtcTimeToLocal(throws[0].endTime)}
+                      </Text>
+                    )}
+                  </View>
+                ) : (
+                  <View style={styles.noThrowContainer}>
+                    <Text style={styles.noThrowText}>
+                      {isLoadingThrows ? '🔄 Cargando...' : '📊 Sin tiradas'}
+                    </Text>
+                  </View>
+                )}
+              </View>
+              </View>
 
-              {/* Estado de tirada */}
-              {throwStatus && (
+            {/* Contador y Botón Enviar */}
+            <View style={styles.bottomActionContainer}>
+              {/* Estado de tirada con tiempo restante */}
+              {throwStatus && throws.length > 0 && (
                 <View style={[styles.statusBadge, { backgroundColor: throwStatus.color }]}>
                   <Text style={styles.statusText}>{throwStatus.text}</Text>
-                </View>
+                  {throws[0].endTime && (
+                    <CountdownTimer 
+                      endTime={throws[0].endTime}
+                      onTimeUp={() => {
+                        console.log('⏰ Tiempo agotado para la tirada');
+                        // Recargar throws cuando el tiempo se agote
+                        if (selectedLotteryId) {
+                          loadThrows(selectedLotteryId);
+                        }
+                      }}
+                    />
               )}
             </View>
+              )}
 
             {/* Botón Enviar */}
           <TouchableOpacity
               style={[
                 styles.sendButton,
-                (!hasValidAmounts() || isSending || !throwStatus || throwStatus.status === 'closed') && styles.sendButtonDisabled
+                  !canSendBet() && styles.sendButtonDisabled
               ]}
               onPress={sendBet}
-              disabled={!hasValidAmounts() || isSending || !throwStatus || throwStatus.status === 'closed'}
+                disabled={!canSendBet()}
             >
               <LinearGradient
-                colors={(!hasValidAmounts() || isSending || !throwStatus || throwStatus.status === 'closed') 
+                  colors={!canSendBet() 
                   ? ['#666', '#444'] 
                   : [colors.primaryGold, colors.primaryRed]}
                 style={styles.sendButtonGradient}
@@ -1379,6 +1685,7 @@ const RegistrarApuesta: React.FC = () => {
                 )}
               </LinearGradient>
           </TouchableOpacity>
+            </View>
           </View>
 
           {/* Indicador de modo AL */}
@@ -1789,17 +2096,22 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   headerContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
     marginBottom: spacing.md,
-    flexWrap: 'wrap',
   },
   selectorsContainer: {
-    flex: 1,
     flexDirection: 'row',
     gap: spacing.sm,
-    flexWrap: 'wrap',
+    marginBottom: spacing.sm,
+  },
+  lotterySelectorContainer: {
+    flex: 1,
+    minWidth: 120,
+  },
+  bottomActionContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
   },
   comboboxStyle: {
     flex: 1,
@@ -1815,6 +2127,13 @@ const styles = StyleSheet.create({
     fontSize: fontSize.xs,
     fontWeight: fontWeight.bold,
     color: 'white',
+  },
+  statusSubText: {
+    fontSize: fontSize.xs,
+    fontWeight: fontWeight.medium,
+    color: 'white',
+    opacity: 0.9,
+    marginTop: 2,
   },
   sendButton: {
     borderRadius: borderRadius.sm,
@@ -2157,6 +2476,81 @@ const styles = StyleSheet.create({
     fontSize: fontSize.sm,
     fontWeight: fontWeight.bold,
     color: 'white',
+  },
+  defaultLotteryContainer: {
+    alignSelf: 'flex-start',
+    marginTop: spacing.xs,
+  },
+  defaultLotteryIndicator: {
+    backgroundColor: `${colors.primaryGold}20`,
+    borderWidth: 1,
+    borderColor: colors.primaryGold,
+    borderRadius: borderRadius.sm,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+  },
+  defaultLotteryText: {
+    fontSize: fontSize.xs,
+    fontWeight: fontWeight.semibold,
+    color: colors.primaryGold,
+  },
+  backToDefaultButton: {
+    backgroundColor: `${colors.primaryGold}10`,
+    borderWidth: 1,
+    borderColor: `${colors.primaryGold}40`,
+    borderRadius: borderRadius.sm,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+  },
+  backToDefaultText: {
+    fontSize: fontSize.xs,
+    fontWeight: fontWeight.medium,
+    color: colors.primaryGold,
+    opacity: 0.8,
+  },
+  activeThrowContainer: {
+    backgroundColor: `${colors.primaryGold}10`,
+    borderWidth: 1,
+    borderColor: `${colors.primaryGold}30`,
+    borderRadius: borderRadius.sm,
+    padding: spacing.sm,
+  },
+  noThrowContainer: {
+    backgroundColor: `${colors.subtleGrey}20`,
+    borderWidth: 1,
+    borderColor: `${colors.subtleGrey}40`,
+    borderRadius: borderRadius.sm,
+    padding: spacing.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 60,
+  },
+  noThrowText: {
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.medium,
+    color: colors.subtleGrey,
+  },
+  throwInfoContainer: {
+    alignItems: 'center',
+  },
+  throwName: {
+    fontSize: fontSize.md,
+    fontWeight: fontWeight.bold,
+    color: colors.primaryGold,
+    marginBottom: spacing.xs,
+  },
+  throwEndTime: {
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.medium,
+    color: colors.lightText,
+    opacity: 0.8,
+  },
+  countdownText: {
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.bold,
+    color: 'white',
+    fontFamily: 'monospace',
+    marginTop: spacing.xs,
   },
 });
 
