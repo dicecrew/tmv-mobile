@@ -14,17 +14,25 @@ interface CardProps {
   icon?: keyof typeof Ionicons.glyphMap;
   children: ReactNode;
   style?: ViewStyle;
+  headerRight?: ReactNode;
 }
 
-const Card: React.FC<CardProps> = ({ title, icon, children, style }) => {
+const Card: React.FC<CardProps> = ({ title, icon, children, style, headerRight }) => {
   return (
     <View style={[styles.card, style]}>
       {title && (
         <View style={styles.header}>
-          {icon && (
-            <Ionicons name={icon} size={22} color={colors.primaryGold} />
+          <View style={styles.headerLeft}>
+            {icon && (
+              <Ionicons name={icon} size={22} color={colors.primaryGold} />
+            )}
+            <Text style={styles.title}>{title}</Text>
+          </View>
+          {headerRight && (
+            <View style={styles.headerRight}>
+              {headerRight}
+            </View>
           )}
-          <Text style={styles.title}>{title}</Text>
         </View>
       )}
       {children}
@@ -55,8 +63,18 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
+    justifyContent: 'space-between',
     marginBottom: spacing.md,
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    flex: 1,
+  },
+  headerRight: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   title: {
     fontSize: fontSize.xl,

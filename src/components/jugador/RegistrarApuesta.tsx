@@ -319,10 +319,27 @@ const RegistrarApuesta: React.FC = () => {
       console.log('🎯 Loterías cargadas:', validLotteries.length, validLotteries);
       setLotteries(validLotteries);
 
-      // Seleccionar primera lotería por defecto solo si no hay selección previa y el usuario no tiene lotería por defecto
-      if (validLotteries.length > 0 && !selectedLotteryId && !user?.defaultLotteryId) {
-        setSelectedLotteryId(validLotteries[0].id);
-        console.log('🎯 Lotería por defecto seleccionada (primera disponible):', validLotteries[0].name);
+      // Manejar selección de lotería por defecto
+      if (validLotteries.length > 0) {
+        if (user?.defaultLotteryId) {
+          // Verificar si la lotería por defecto del usuario está disponible
+          const isDefaultLotteryAvailable = validLotteries.some(lottery => lottery.id === user.defaultLotteryId);
+          
+          if (isDefaultLotteryAvailable) {
+            setSelectedLotteryId(user.defaultLotteryId);
+            console.log('🎯 Lotería por defecto del usuario seleccionada:', user.defaultLotteryId, user.defaultLotteryName);
+          } else {
+            console.warn('⚠️ Lotería por defecto del usuario no está disponible en las loterías activas');
+            setSelectedLotteryId(validLotteries[0].id);
+            console.log('🎯 Primera lotería disponible seleccionada:', validLotteries[0].name);
+          }
+        } else {
+          // Si no hay lotería por defecto del usuario, seleccionar la primera disponible
+          if (!selectedLotteryId) {
+            setSelectedLotteryId(validLotteries[0].id);
+            console.log('🎯 Primera lotería disponible seleccionada:', validLotteries[0].name);
+          }
+        }
       }
     } catch (error) {
       console.error('❌ Error loading lotteries:', error);
@@ -356,23 +373,40 @@ const RegistrarApuesta: React.FC = () => {
         throw new Error('ID de lotería inválido');
       }
       
-      // Usar solo el endpoint correcto del proyecto web
-      console.log('🔄 Usando endpoint del proyecto web: /api/Throw/lottery/' + lotteryId + '/active');
-      const response = await throwService.getActiveThrowsByLottery(lotteryId);
-      console.log('✅ Throws cargados:', response);
+      // Usar el endpoint correcto del proyecto web: active-for-time
+      const utcTime = new Date().toISOString();
+      console.log('🔄 Usando endpoint: /api/Throw/lottery/' + lotteryId + '/active/for-time');
+      console.log('🔄 Fecha UTC:', utcTime);
+      
+      let response;
+      try {
+        response = await throwService.getActiveThrowsByLotteryForTime(lotteryId, utcTime);
+        console.log('✅ Throws cargados con active-for-time:', response);
+      } catch (activeForTimeError) {
+        console.warn('⚠️ Error con active-for-time, usando fallback active:', activeForTimeError);
+        // Fallback al endpoint active si active-for-time falla
+        response = await throwService.getActiveThrowsByLottery(lotteryId);
+        console.log('✅ Throws cargados con fallback active:', response);
+      }
 
       let throwsArray: any[] = [];
       
       // Manejo robusto de diferentes formatos de respuesta (homologo al proyecto web)
       if (response) {
         if (Array.isArray(response)) {
-        throwsArray = response;
+          throwsArray = response;
         } else if (response.data) {
           if (Array.isArray(response.data)) {
             throwsArray = response.data;
+          } else if (typeof response.data === 'object' && response.data.id) {
+            // El endpoint active-for-time devuelve un objeto único, no un array
+            throwsArray = [response.data];
           } else if (typeof response.data === 'object') {
-        throwsArray = Object.values(response.data);
+            throwsArray = Object.values(response.data);
           }
+        } else if (typeof response === 'object' && response.id) {
+          // Si response es directamente el objeto de la tirada
+          throwsArray = [response];
         } else if (typeof response === 'object') {
           throwsArray = Object.values(response);
         }
@@ -728,29 +762,8 @@ const RegistrarApuesta: React.FC = () => {
         // Cargar loterías
         await loadActiveLotteries();
         
-        // Si el usuario tiene lotería por defecto, usarla
-        if (user?.defaultLotteryId) {
-          console.log('🎯 Usando lotería por defecto del usuario:', user.defaultLotteryId, user.defaultLotteryName);
-          
-          // Verificar que la lotería por defecto esté en la lista de loterías activas
-          const isDefaultLotteryAvailable = lotteries.some(lottery => lottery.id === user.defaultLotteryId);
-          
-          if (isDefaultLotteryAvailable) {
-            setSelectedLotteryId(user.defaultLotteryId);
-            console.log('✅ Lotería por defecto del usuario está disponible');
-            
-            // Cargar throws de la lotería por defecto
-            await loadThrows(user.defaultLotteryId);
-          } else {
-            console.warn('⚠️ Lotería por defecto del usuario no está disponible en las loterías activas');
-            // Si no está disponible, seleccionar la primera disponible
-            if (lotteries.length > 0) {
-              setSelectedLotteryId(lotteries[0].id);
-              await loadThrows(lotteries[0].id);
-            }
-          }
-        }
-        
+        // Esperar a que las loterías se carguen antes de continuar
+        // La función loadActiveLotteries ya maneja la selección de la lotería por defecto
         console.log('✅ Datos inicializados correctamente');
       } catch (error) {
         console.error('❌ Error inicializando datos:', error);
@@ -1591,8 +1604,39 @@ const RegistrarApuesta: React.FC = () => {
       keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
     >
       <ScrollView style={styles.scrollView} keyboardShouldPersistTaps="handled">
-        <Card title="Registrar Apuesta" icon="dice-outline">
-          {/* Header con selectores de Lotería/Tirada y botón Enviar */}
+        <Card 
+          title="Registrar Apuesta" 
+          icon="dice-outline"
+          headerRight={
+          <TouchableOpacity
+              style={[
+                styles.sendButton,
+                !canSendBet() && styles.sendButtonDisabled
+              ]}
+              onPress={sendBet}
+              disabled={!canSendBet()}
+            >
+              <LinearGradient
+                colors={!canSendBet() 
+                  ? ['#666', '#444'] 
+                  : [colors.primaryGold, colors.primaryRed]}
+                style={styles.sendButtonGradient}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+              >
+                {isSending ? (
+                  <ActivityIndicator size="small" color="white" />
+                ) : (
+                  <>
+                    <Ionicons name="send-outline" size={16} color="white" />
+                    <Text style={styles.sendButtonText}>Enviar</Text>
+                  </>
+                )}
+              </LinearGradient>
+          </TouchableOpacity>
+          }
+        >
+          {/* Header con selectores de Lotería/Tirada */}
           <View style={styles.headerContainer}>
             <View style={styles.selectorsContainer}>
               {/* Selector de Lotería */}
@@ -1637,7 +1681,7 @@ const RegistrarApuesta: React.FC = () => {
               </View>
               </View>
 
-            {/* Contador y Botón Enviar */}
+            {/* Contador de tiempo */}
             <View style={styles.bottomActionContainer}>
               {/* Estado de tirada con tiempo restante */}
               {throwStatus && throws.length > 0 && (
@@ -1654,37 +1698,9 @@ const RegistrarApuesta: React.FC = () => {
                         }
                       }}
                     />
+                  )}
+                </View>
               )}
-            </View>
-              )}
-
-            {/* Botón Enviar */}
-          <TouchableOpacity
-              style={[
-                styles.sendButton,
-                  !canSendBet() && styles.sendButtonDisabled
-              ]}
-              onPress={sendBet}
-                disabled={!canSendBet()}
-            >
-              <LinearGradient
-                  colors={!canSendBet() 
-                  ? ['#666', '#444'] 
-                  : [colors.primaryGold, colors.primaryRed]}
-                style={styles.sendButtonGradient}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-              >
-                {isSending ? (
-                  <ActivityIndicator size="small" color="white" />
-                ) : (
-                  <>
-                    <Ionicons name="send-outline" size={16} color="white" />
-                    <Text style={styles.sendButtonText}>Enviar</Text>
-                  </>
-                )}
-              </LinearGradient>
-          </TouchableOpacity>
             </View>
           </View>
 
@@ -2107,10 +2123,14 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 120,
   },
+  throwInfoContainer: {
+    flex: 1,
+    minWidth: 120,
+  },
   bottomActionContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-start',
     gap: spacing.sm,
   },
   comboboxStyle: {
@@ -2514,6 +2534,9 @@ const styles = StyleSheet.create({
     borderColor: `${colors.primaryGold}30`,
     borderRadius: borderRadius.sm,
     padding: spacing.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 40,
   },
   noThrowContainer: {
     backgroundColor: `${colors.subtleGrey}20`,
@@ -2523,24 +2546,21 @@ const styles = StyleSheet.create({
     padding: spacing.sm,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 60,
+    minHeight: 40,
   },
   noThrowText: {
-    fontSize: fontSize.sm,
+    fontSize: fontSize.xs,
     fontWeight: fontWeight.medium,
     color: colors.subtleGrey,
   },
-  throwInfoContainer: {
-    alignItems: 'center',
-  },
   throwName: {
-    fontSize: fontSize.md,
+    fontSize: fontSize.sm,
     fontWeight: fontWeight.bold,
     color: colors.primaryGold,
-    marginBottom: spacing.xs,
+    marginBottom: 2,
   },
   throwEndTime: {
-    fontSize: fontSize.sm,
+    fontSize: fontSize.xs,
     fontWeight: fontWeight.medium,
     color: colors.lightText,
     opacity: 0.8,

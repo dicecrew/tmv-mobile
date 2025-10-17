@@ -284,12 +284,18 @@ export const throwService = {
     }),
 
   // Obtener lanzamientos activos por lotería y tiempo
-  getActiveThrowsByLotteryForTime: (lotteryId: string, utcTime: string) =>
-    customInstance<any>({
-      url: `/api/Throw/lottery/${lotteryId}/active/for-time`,
+  getActiveThrowsByLotteryForTime: (lotteryId: string, utcTime: string) => {
+    console.log('🔍 throwService.getActiveThrowsByLotteryForTime - Parámetros:');
+    console.log('  - lotteryId:', lotteryId);
+    console.log('  - utcTime:', utcTime);
+    console.log('  - URL completa:', `/api/Throw/lottery/${lotteryId}/active-for-time?utcTime=${encodeURIComponent(utcTime)}`);
+    
+    return customInstance<any>({
+      url: `/api/Throw/lottery/${lotteryId}/active-for-time`,
       method: 'GET',
       params: { utcTime }
-    }),
+    });
+  },
 
   // Crear lanzamiento
   createThrow: (throwData: any) =>

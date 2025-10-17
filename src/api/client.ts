@@ -170,6 +170,16 @@ export const customInstance = <T>(
     console.log('Data stringified:', JSON.stringify(finalConfig.data));
   }
 
+  // Debug logging para throws active-for-time
+  if (finalConfig.url?.includes('active-for-time')) {
+    console.log('🔍 Debug active-for-time request:');
+    console.log('URL completa:', finalConfig.url);
+    console.log('Method:', finalConfig.method);
+    console.log('Params:', finalConfig.params);
+    console.log('Headers:', finalConfig.headers);
+    console.log('Base URL:', baseURL);
+  }
+
   return axiosInstance(finalConfig);
 };
 
