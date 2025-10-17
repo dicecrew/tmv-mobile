@@ -11,7 +11,7 @@ import {
 import Combobox, { ComboboxOption } from '../common/Combobox';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import DateTimePicker from '@react-native-community/datetimepicker';
+import DateRangePicker from '../common/DateRangePicker';
 import { colors, spacing, borderRadius, fontSize, fontWeight } from '../../styles/GlobalStyles';
 import Card from '../common/Card';
 import Toast from 'react-native-toast-message';
@@ -54,8 +54,6 @@ const VerMovimientos: React.FC = () => {
   const [selectedBookie, setSelectedBookie] = useState('');
   const [dateFrom, setDateFrom] = useState(new Date());
   const [dateTo, setDateTo] = useState(new Date());
-  const [showDateFromPicker, setShowDateFromPicker] = useState(false);
-  const [showDateToPicker, setShowDateToPicker] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [isLoadingData, setIsLoadingData] = useState(false);
   const [betResumeData, setBetResumeData] = useState<DateData[]>([]);
@@ -101,34 +99,10 @@ const VerMovimientos: React.FC = () => {
     loadListeros();
   }, []);
 
-  // Manejar cambio de fecha desde
-  const handleDateFromChange = (event: any, selectedDate?: Date) => {
-    setShowDateFromPicker(Platform.OS === 'ios');
-    if (event.type === 'dismissed') {
-      setShowDateFromPicker(false);
-      return;
-    }
-    if (selectedDate) {
-      setDateFrom(selectedDate);
-      if (Platform.OS === 'android') {
-        setShowDateFromPicker(false);
-      }
-    }
-  };
-
-  // Manejar cambio de fecha hasta
-  const handleDateToChange = (event: any, selectedDate?: Date) => {
-    setShowDateToPicker(Platform.OS === 'ios');
-    if (event.type === 'dismissed') {
-      setShowDateToPicker(false);
-      return;
-    }
-    if (selectedDate) {
-      setDateTo(selectedDate);
-      if (Platform.OS === 'android') {
-        setShowDateToPicker(false);
-      }
-    }
+  // Manejar cambio de rango de fechas
+  const handleDateRangeChange = (dateFrom: Date, dateTo: Date) => {
+    setDateFrom(dateFrom);
+    setDateTo(dateTo);
   };
 
   // Convertir fecha local a UTC
@@ -252,29 +226,19 @@ const VerMovimientos: React.FC = () => {
             />
           </View>
 
-          <View style={styles.dateFilters}>
-            <View style={styles.dateFilterItem}>
-              <Text style={styles.dateLabel}>📅 Desde:</Text>
-              <TouchableOpacity
-                style={styles.dateButton}
-                onPress={() => setShowDateFromPicker(true)}
-              >
-                <Text style={styles.dateButtonText}>{dateFrom.toLocaleDateString()}</Text>
-                <Ionicons name="calendar-outline" size={16} color={colors.primaryGold} />
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.dateFilterItem}>
-              <Text style={styles.dateLabel}>📅 Hasta:</Text>
-              <TouchableOpacity
-                style={styles.dateButton}
-                onPress={() => setShowDateToPicker(true)}
-              >
-                <Text style={styles.dateButtonText}>{dateTo.toLocaleDateString()}</Text>
-                <Ionicons name="calendar-outline" size={16} color={colors.primaryGold} />
-              </TouchableOpacity>
-            </View>
-          </View>
+          <DateRangePicker
+            dateFrom={dateFrom}
+            dateTo={dateTo}
+            onDateFromChange={setDateFrom}
+            onDateToChange={setDateTo}
+            onRangeChange={handleDateRangeChange}
+            label="Rango de Fechas"
+            maximumDate={new Date()}
+            dateFormat="short"
+            showLabels={true}
+            required={true}
+            helpText="Selecciona el rango de fechas para consultar los movimientos"
+          />
 
           <View style={styles.filterButtons}>
             <TouchableOpacity
@@ -471,26 +435,6 @@ const VerMovimientos: React.FC = () => {
         )}
       </Card>
 
-      {/* Date Pickers */}
-      {showDateFromPicker && (
-        <DateTimePicker
-          value={dateFrom}
-          mode="date"
-          display="default"
-          onChange={handleDateFromChange}
-          maximumDate={new Date()}
-        />
-      )}
-
-      {showDateToPicker && (
-        <DateTimePicker
-          value={dateTo}
-          mode="date"
-          display="default"
-          onChange={handleDateToChange}
-          maximumDate={new Date()}
-        />
-      )}
     </View>
   );
 };
@@ -518,33 +462,6 @@ const styles = StyleSheet.create({
     fontWeight: fontWeight.semibold,
     color: colors.lightText,
     marginBottom: spacing.sm,
-  },
-  dateFilters: {
-    gap: spacing.md,
-    marginBottom: spacing.md,
-  },
-  dateFilterItem: {
-    marginBottom: spacing.sm,
-  },
-  dateLabel: {
-    fontSize: fontSize.sm,
-    fontWeight: fontWeight.semibold,
-    color: colors.primaryGold,
-    marginBottom: spacing.xs,
-  },
-  dateButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: colors.darkBackground,
-    borderWidth: 1,
-    borderColor: colors.inputBorder,
-    borderRadius: borderRadius.md,
-    padding: spacing.md,
-  },
-  dateButtonText: {
-    fontSize: fontSize.md,
-    color: colors.lightText,
   },
   filterButtons: {
     flexDirection: 'row',

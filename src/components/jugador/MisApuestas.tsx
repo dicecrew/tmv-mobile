@@ -9,9 +9,9 @@ import {
   Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import DateTimePicker from '@react-native-community/datetimepicker';
 import { colors, spacing, borderRadius, fontSize, fontWeight } from '../../styles/GlobalStyles';
 import Card from '../common/Card';
+import DateRangePicker from '../common/DateRangePicker';
 import Toast from 'react-native-toast-message';
 import { betService } from '../../api/services';
 import { useAuth } from '../../contexts/AuthContext';
@@ -52,8 +52,6 @@ const MisApuestas: React.FC = () => {
 
   const [fromDate, setFromDate] = useState(getSevenDaysAgo());
   const [toDate, setToDate] = useState(new Date());
-  const [showFromPicker, setShowFromPicker] = useState(false);
-  const [showToPicker, setShowToPicker] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [bets, setBets] = useState<Bet[]>([]);
   const [expandedDate, setExpandedDate] = useState<string | null>(null);
@@ -114,33 +112,10 @@ const MisApuestas: React.FC = () => {
     }
   };
 
-  // Manejar cambio de fecha
-  const handleFromDateChange = (event: any, selected?: Date) => {
-    setShowFromPicker(Platform.OS === 'ios');
-    if (event.type === 'dismissed') {
-      setShowFromPicker(false);
-      return;
-    }
-    if (selected) {
-      setFromDate(selected);
-      if (Platform.OS === 'android') {
-        setShowFromPicker(false);
-      }
-    }
-  };
-
-  const handleToDateChange = (event: any, selected?: Date) => {
-    setShowToPicker(Platform.OS === 'ios');
-    if (event.type === 'dismissed') {
-      setShowToPicker(false);
-      return;
-    }
-    if (selected) {
-      setToDate(selected);
-      if (Platform.OS === 'android') {
-        setShowToPicker(false);
-      }
-    }
+  // Manejar cambio de rango de fechas
+  const handleDateRangeChange = (dateFrom: Date, dateTo: Date) => {
+    setFromDate(dateFrom);
+    setToDate(dateTo);
   };
 
   // Agrupar apuestas por fecha
@@ -290,23 +265,19 @@ const MisApuestas: React.FC = () => {
         {/* Filtros */}
         {!showHistory && (
           <View style={styles.filtersSection}>
-            <View style={styles.dateRow}>
-              <View style={styles.dateGroup}>
-                <Text style={styles.label}>Desde</Text>
-                <TouchableOpacity style={styles.dateButton} onPress={() => setShowFromPicker(true)}>
-                  <Text style={styles.dateButtonText}>{fromDate.toLocaleDateString()}</Text>
-                  <Ionicons name="calendar-outline" size={16} color={colors.primaryGold} />
-          </TouchableOpacity>
-        </View>
-
-              <View style={styles.dateGroup}>
-                <Text style={styles.label}>Hasta</Text>
-                <TouchableOpacity style={styles.dateButton} onPress={() => setShowToPicker(true)}>
-                  <Text style={styles.dateButtonText}>{toDate.toLocaleDateString()}</Text>
-                  <Ionicons name="calendar-outline" size={16} color={colors.primaryGold} />
-                </TouchableOpacity>
-              </View>
-            </View>
+            <DateRangePicker
+              dateFrom={fromDate}
+              dateTo={toDate}
+              onDateFromChange={setFromDate}
+              onDateToChange={setToDate}
+              onRangeChange={handleDateRangeChange}
+              label="Rango de Fechas"
+              maximumDate={new Date()}
+              dateFormat="short"
+              showLabels={true}
+              required={true}
+              helpText="Selecciona el rango de fechas para consultar tus apuestas"
+            />
             
             <TouchableOpacity
               style={styles.searchButton}
@@ -436,25 +407,6 @@ const MisApuestas: React.FC = () => {
         )}
       </Card>
       
-      {/* Date Pickers */}
-      {showFromPicker && (
-        <DateTimePicker
-          value={fromDate}
-          mode="date"
-          display="default"
-          onChange={handleFromDateChange}
-          maximumDate={new Date()}
-        />
-      )}
-      {showToPicker && (
-        <DateTimePicker
-          value={toDate}
-          mode="date"
-          display="default"
-          onChange={handleToDateChange}
-          maximumDate={new Date()}
-        />
-      )}
     </View>
   );
 };
@@ -474,34 +426,6 @@ const styles = StyleSheet.create({
   },
   filtersSection: {
     marginBottom: spacing.lg,
-  },
-  dateRow: {
-    flexDirection: 'row',
-    gap: spacing.md,
-    marginBottom: spacing.lg,
-  },
-  dateGroup: {
-    flex: 1,
-  },
-  label: {
-    fontSize: fontSize.sm,
-    fontWeight: fontWeight.semibold,
-    color: colors.lightText,
-    marginBottom: spacing.sm,
-  },
-  dateButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: colors.darkBackground,
-    borderWidth: 1,
-    borderColor: colors.inputBorder,
-    borderRadius: borderRadius.md,
-    padding: spacing.md,
-  },
-  dateButtonText: {
-    fontSize: fontSize.md,
-    color: colors.lightText,
   },
   searchButton: {
     flexDirection: 'row',

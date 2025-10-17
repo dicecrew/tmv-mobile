@@ -6,13 +6,12 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
-  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import DateTimePicker from '@react-native-community/datetimepicker';
 import { colors, spacing, borderRadius, fontSize, fontWeight } from '../../styles/GlobalStyles';
 import Card from '../common/Card';
+import DateRangePicker from '../common/DateRangePicker';
 import Toast from 'react-native-toast-message';
 import { incomesLogService } from '../../api/services';
 
@@ -49,41 +48,15 @@ const ReporteRecaudacion: React.FC = () => {
 
   const [dateFrom, setDateFrom] = useState(new Date());
   const [dateTo, setDateTo] = useState(new Date());
-  const [showDateFromPicker, setShowDateFromPicker] = useState(false);
-  const [showDateToPicker, setShowDateToPicker] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [showReport, setShowReport] = useState(false);
   const [reportData, setReportData] = useState<any>(null);
   const [expandedListeros, setExpandedListeros] = useState<{ [key: string]: boolean }>({});
 
-  // Manejar cambio de fecha desde
-  const handleDateFromChange = (event: any, selectedDate?: Date) => {
-    setShowDateFromPicker(Platform.OS === 'ios');
-    if (event.type === 'dismissed') {
-      setShowDateFromPicker(false);
-      return;
-    }
-    if (selectedDate) {
-      setDateFrom(selectedDate);
-      if (Platform.OS === 'android') {
-        setShowDateFromPicker(false);
-      }
-    }
-  };
-
-  // Manejar cambio de fecha hasta
-  const handleDateToChange = (event: any, selectedDate?: Date) => {
-    setShowDateToPicker(Platform.OS === 'ios');
-    if (event.type === 'dismissed') {
-      setShowDateToPicker(false);
-      return;
-    }
-    if (selectedDate) {
-      setDateTo(selectedDate);
-      if (Platform.OS === 'android') {
-        setShowDateToPicker(false);
-      }
-    }
+  // Manejar cambio de rango de fechas
+  const handleDateRangeChange = (dateFrom: Date, dateTo: Date) => {
+    setDateFrom(dateFrom);
+    setDateTo(dateTo);
   };
 
   // Convertir fecha local a UTC
@@ -236,33 +209,19 @@ const ReporteRecaudacion: React.FC = () => {
         </Text>
 
         {/* Filtros de fecha */}
-        <View style={styles.dateFilters}>
-          <View style={styles.dateFilterItem}>
-            <Text style={styles.dateLabel}>📅 Desde:</Text>
-            <TouchableOpacity
-              style={styles.dateButton}
-              onPress={() => setShowDateFromPicker(true)}
-            >
-              <Text style={styles.dateButtonText}>
-                {dateFrom.toLocaleDateString()}
-              </Text>
-              <Ionicons name="calendar-outline" size={16} color={colors.primaryGold} />
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.dateFilterItem}>
-            <Text style={styles.dateLabel}>📅 Hasta:</Text>
-            <TouchableOpacity
-              style={styles.dateButton}
-              onPress={() => setShowDateToPicker(true)}
-            >
-              <Text style={styles.dateButtonText}>
-                {dateTo.toLocaleDateString()}
-              </Text>
-              <Ionicons name="calendar-outline" size={16} color={colors.primaryGold} />
-            </TouchableOpacity>
-          </View>
-        </View>
+        <DateRangePicker
+          dateFrom={dateFrom}
+          dateTo={dateTo}
+          onDateFromChange={setDateFrom}
+          onDateToChange={setDateTo}
+          onRangeChange={handleDateRangeChange}
+          label="Rango de Fechas"
+          maximumDate={new Date()}
+          dateFormat="short"
+          showLabels={true}
+          required={true}
+          helpText="Selecciona el rango de fechas para generar el reporte de recaudación"
+        />
 
         <TouchableOpacity
           style={styles.generateButton}
@@ -381,26 +340,6 @@ const ReporteRecaudacion: React.FC = () => {
         )}
       </Card>
 
-      {/* Date Pickers */}
-      {showDateFromPicker && (
-        <DateTimePicker
-          value={dateFrom}
-          mode="date"
-          display="default"
-          onChange={handleDateFromChange}
-          maximumDate={new Date()}
-        />
-      )}
-
-      {showDateToPicker && (
-        <DateTimePicker
-          value={dateTo}
-          mode="date"
-          display="default"
-          onChange={handleDateToChange}
-          maximumDate={new Date()}
-        />
-      )}
     </View>
   );
 };
@@ -426,33 +365,6 @@ const styles = StyleSheet.create({
     color: colors.subtleGrey,
     marginBottom: spacing.lg,
     lineHeight: 20,
-  },
-  dateFilters: {
-    gap: spacing.md,
-    marginBottom: spacing.lg,
-  },
-  dateFilterItem: {
-    marginBottom: spacing.md,
-  },
-  dateLabel: {
-    fontSize: fontSize.sm,
-    fontWeight: fontWeight.semibold,
-    color: colors.primaryGold,
-    marginBottom: spacing.sm,
-  },
-  dateButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: colors.darkBackground,
-    borderWidth: 1,
-    borderColor: colors.inputBorder,
-    borderRadius: borderRadius.md,
-    padding: spacing.md,
-  },
-  dateButtonText: {
-    fontSize: fontSize.md,
-    color: colors.lightText,
   },
   generateButton: {
     borderRadius: borderRadius.md,

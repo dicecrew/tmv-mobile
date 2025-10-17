@@ -8,13 +8,12 @@ import {
   ActivityIndicator,
   Alert,
   Modal,
-  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import DateTimePicker from '@react-native-community/datetimepicker';
 import { colors, spacing, borderRadius, fontSize, fontWeight } from '../../styles/GlobalStyles';
 import Card from '../common/Card';
+import DatePicker from '../common/DatePicker';
 import Toast from 'react-native-toast-message';
 import { throwService } from '../../api/services';
 
@@ -36,8 +35,6 @@ const GestionarTiradas: React.FC = () => {
   const [editTiradaData, setEditTiradaData] = useState<Tirada | null>(null);
   
   // Time pickers
-  const [showStartTimePicker, setShowStartTimePicker] = useState(false);
-  const [showEndTimePicker, setShowEndTimePicker] = useState(false);
   const [startTime, setStartTime] = useState(new Date());
   const [endTime, setEndTime] = useState(new Date());
 
@@ -124,35 +121,6 @@ const GestionarTiradas: React.FC = () => {
     setShowEditModal(true);
   };
 
-  // Manejar cambio de hora de inicio
-  const handleStartTimeChange = (event: any, selectedDate?: Date) => {
-    setShowStartTimePicker(Platform.OS === 'ios');
-    if (event.type === 'dismissed') {
-      setShowStartTimePicker(false);
-      return;
-    }
-    if (selectedDate) {
-      setStartTime(selectedDate);
-      if (Platform.OS === 'android') {
-        setShowStartTimePicker(false);
-      }
-    }
-  };
-
-  // Manejar cambio de hora de fin
-  const handleEndTimeChange = (event: any, selectedDate?: Date) => {
-    setShowEndTimePicker(Platform.OS === 'ios');
-    if (event.type === 'dismissed') {
-      setShowEndTimePicker(false);
-      return;
-    }
-    if (selectedDate) {
-      setEndTime(selectedDate);
-      if (Platform.OS === 'android') {
-        setShowEndTimePicker(false);
-      }
-    }
-  };
 
   // Guardar cambios
   const handleSaveEdit = async () => {
@@ -358,43 +326,27 @@ const GestionarTiradas: React.FC = () => {
                 </View>
 
                 <View style={styles.formGroup}>
-                  <Text style={styles.label}>Hora de Inicio</Text>
-                  <TouchableOpacity
-                    style={styles.timeButton}
-                    onPress={() => setShowStartTimePicker(true)}
-                  >
-                    <Ionicons name="time-outline" size={20} color={colors.primaryGold} />
-                    <Text style={styles.timeButtonText}>
-                      {startTime.toLocaleTimeString('es-ES', {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                        hour12: true,
-                      })}
-                    </Text>
-                  </TouchableOpacity>
-                  <Text style={styles.helperText}>
-                    Fecha: {startTime.toLocaleDateString()}
-                  </Text>
+                  <DatePicker
+                    value={startTime}
+                    onDateChange={setStartTime}
+                    label="Hora de Inicio"
+                    icon="time-outline"
+                    mode="time"
+                    showIcon={true}
+                    helpText="Selecciona la hora de inicio de la tirada"
+                  />
                 </View>
 
                 <View style={styles.formGroup}>
-                  <Text style={styles.label}>Hora de Fin</Text>
-                  <TouchableOpacity
-                    style={styles.timeButton}
-                    onPress={() => setShowEndTimePicker(true)}
-                  >
-                    <Ionicons name="time-outline" size={20} color={colors.primaryGold} />
-                    <Text style={styles.timeButtonText}>
-                      {endTime.toLocaleTimeString('es-ES', {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                        hour12: true,
-                      })}
-                    </Text>
-                  </TouchableOpacity>
-                  <Text style={styles.helperText}>
-                    Fecha: {endTime.toLocaleDateString()}
-                  </Text>
+                  <DatePicker
+                    value={endTime}
+                    onDateChange={setEndTime}
+                    label="Hora de Fin"
+                    icon="time-outline"
+                    mode="time"
+                    showIcon={true}
+                    helpText="Selecciona la hora de fin de la tirada"
+                  />
                 </View>
 
                 <View style={styles.buttonGroup}>
@@ -430,26 +382,6 @@ const GestionarTiradas: React.FC = () => {
         </View>
       </Modal>
 
-      {/* Time Pickers */}
-      {showStartTimePicker && (
-        <DateTimePicker
-          value={startTime}
-          mode="time"
-          is24Hour={false}
-          display="default"
-          onChange={handleStartTimeChange}
-        />
-      )}
-
-      {showEndTimePicker && (
-        <DateTimePicker
-          value={endTime}
-          mode="time"
-          is24Hour={false}
-          display="default"
-          onChange={handleEndTimeChange}
-        />
-      )}
     </View>
   );
 };
@@ -616,21 +548,6 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.md,
     borderWidth: 1,
     borderColor: colors.inputBorder,
-  },
-  timeButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    backgroundColor: colors.darkBackground,
-    padding: spacing.md,
-    borderRadius: borderRadius.md,
-    borderWidth: 2,
-    borderColor: colors.inputBorder,
-  },
-  timeButtonText: {
-    fontSize: fontSize.md,
-    fontWeight: fontWeight.semibold,
-    color: colors.lightText,
   },
   helperText: {
     fontSize: fontSize.xs,

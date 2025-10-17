@@ -11,7 +11,7 @@ import {
 import Combobox, { ComboboxOption } from '../common/Combobox';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import DateTimePicker from '@react-native-community/datetimepicker';
+import DateRangePicker from '../common/DateRangePicker';
 import { colors, spacing, borderRadius, fontSize, fontWeight } from '../../styles/GlobalStyles';
 import Card from '../common/Card';
 import Toast from 'react-native-toast-message';
@@ -76,8 +76,6 @@ const VerHistorial: React.FC = () => {
   const [selectedPlayer, setSelectedPlayer] = useState('');
   const [dateFrom, setDateFrom] = useState(new Date());
   const [dateTo, setDateTo] = useState(new Date());
-  const [showFromPicker, setShowFromPicker] = useState(false);
-  const [showToPicker, setShowToPicker] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
 
   const [players, setPlayers] = useState<Player[]>([]);
@@ -211,33 +209,10 @@ const VerHistorial: React.FC = () => {
     }
   }, [bookieId]);
 
-  // Manejar cambio de fecha
-  const handleFromDateChange = (event: any, selected?: Date) => {
-    setShowFromPicker(Platform.OS === 'ios');
-    if (event.type === 'dismissed') {
-      setShowFromPicker(false);
-      return;
-    }
-    if (selected) {
-      setDateFrom(selected);
-      if (Platform.OS === 'android') {
-        setShowFromPicker(false);
-      }
-    }
-  };
-
-  const handleToDateChange = (event: any, selected?: Date) => {
-    setShowToPicker(Platform.OS === 'ios');
-    if (event.type === 'dismissed') {
-      setShowToPicker(false);
-      return;
-    }
-    if (selected) {
-      setDateTo(selected);
-      if (Platform.OS === 'android') {
-        setShowToPicker(false);
-      }
-    }
+  // Manejar cambio de rango de fechas
+  const handleDateRangeChange = (dateFrom: Date, dateTo: Date) => {
+    setDateFrom(dateFrom);
+    setDateTo(dateTo);
   };
 
   // Alternar expansión
@@ -390,23 +365,19 @@ const VerHistorial: React.FC = () => {
               />
             </View>
 
-            <View style={styles.dateRow}>
-              <View style={styles.dateGroup}>
-                <Text style={styles.label}>Desde</Text>
-                <TouchableOpacity style={styles.dateButton} onPress={() => setShowFromPicker(true)}>
-                  <Text style={styles.dateButtonText}>{dateFrom.toLocaleDateString()}</Text>
-                  <Ionicons name="calendar-outline" size={16} color={colors.primaryGold} />
-                </TouchableOpacity>
-          </View>
-
-              <View style={styles.dateGroup}>
-                <Text style={styles.label}>Hasta</Text>
-                <TouchableOpacity style={styles.dateButton} onPress={() => setShowToPicker(true)}>
-                  <Text style={styles.dateButtonText}>{dateTo.toLocaleDateString()}</Text>
-                  <Ionicons name="calendar-outline" size={16} color={colors.primaryGold} />
-                </TouchableOpacity>
-                </View>
-            </View>
+            <DateRangePicker
+              dateFrom={dateFrom}
+              dateTo={dateTo}
+              onDateFromChange={setDateFrom}
+              onDateToChange={setDateTo}
+              onRangeChange={handleDateRangeChange}
+              label="Rango de Fechas"
+              maximumDate={new Date()}
+              dateFormat="short"
+              showLabels={true}
+              required={true}
+              helpText="Selecciona el rango de fechas para consultar el historial"
+            />
 
             <TouchableOpacity
               style={styles.applyButton}
@@ -582,25 +553,6 @@ const VerHistorial: React.FC = () => {
         )}
       </Card>
 
-      {/* Date Pickers */}
-      {showFromPicker && (
-        <DateTimePicker
-          value={dateFrom}
-          mode="date"
-          display="default"
-          onChange={handleFromDateChange}
-          maximumDate={new Date()}
-        />
-      )}
-      {showToPicker && (
-        <DateTimePicker
-          value={dateTo}
-          mode="date"
-          display="default"
-          onChange={handleToDateChange}
-          maximumDate={new Date()}
-        />
-      )}
     </View>
   );
 };
@@ -629,28 +581,6 @@ const styles = StyleSheet.create({
     fontWeight: fontWeight.semibold,
     color: colors.lightText,
     marginBottom: spacing.sm,
-  },
-  dateRow: {
-    flexDirection: 'row',
-    gap: spacing.md,
-    marginBottom: spacing.lg,
-  },
-  dateGroup: {
-    flex: 1,
-  },
-  dateButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: colors.darkBackground,
-    borderWidth: 1,
-    borderColor: colors.inputBorder,
-    borderRadius: borderRadius.md,
-    padding: spacing.md,
-  },
-  dateButtonText: {
-    fontSize: fontSize.md,
-    color: colors.lightText,
   },
   applyButton: {
     borderRadius: borderRadius.md,

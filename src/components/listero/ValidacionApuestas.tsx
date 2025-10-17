@@ -11,9 +11,9 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import DateTimePicker from '@react-native-community/datetimepicker';
 import { colors, spacing, borderRadius, fontSize, fontWeight } from '../../styles/GlobalStyles';
 import Card from '../common/Card';
+import DatePicker from '../common/DatePicker';
 import Toast from 'react-native-toast-message';
 import { bookieService } from '../../api/services';
 
@@ -48,7 +48,6 @@ interface State {
 
 const ValidacionApuestas: React.FC = () => {
   const [selectedDate, setSelectedDate] = useState(new Date());
-  const [showDatePicker, setShowDatePicker] = useState(false);
   const [showOnlyPending, setShowOnlyPending] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [bets, setBets] = useState<Bet[]>([]);
@@ -144,20 +143,6 @@ const ValidacionApuestas: React.FC = () => {
     loadBets();
   }, [selectedDate, showOnlyPending]);
 
-  // Manejar cambio de fecha
-  const handleDateChange = (event: any, selected?: Date) => {
-    setShowDatePicker(Platform.OS === 'ios');
-    if (event.type === 'dismissed') {
-      setShowDatePicker(false);
-      return;
-    }
-    if (selected) {
-      setSelectedDate(selected);
-      if (Platform.OS === 'android') {
-        setShowDatePicker(false);
-      }
-    }
-  };
 
   // Validar apuesta
   const handleValidateBet = (bet: Bet) => {
@@ -314,13 +299,16 @@ const ValidacionApuestas: React.FC = () => {
             </TouchableOpacity>
           </View>
 
-          <View style={styles.dateFilter}>
-            <Text style={styles.filterLabel}>📅 Fecha:</Text>
-            <TouchableOpacity style={styles.dateButton} onPress={() => setShowDatePicker(true)}>
-              <Text style={styles.dateButtonText}>{selectedDate.toLocaleDateString()}</Text>
-              <Ionicons name="calendar-outline" size={16} color={colors.primaryGold} />
-            </TouchableOpacity>
-          </View>
+          <DatePicker
+            value={selectedDate}
+            onDateChange={setSelectedDate}
+            label="Fecha"
+            icon="calendar-outline"
+            maximumDate={new Date()}
+            dateFormat="short"
+            showIcon={true}
+            helpText="Selecciona la fecha para validar apuestas"
+          />
 
           <TouchableOpacity
             style={styles.filterToggle}
@@ -449,16 +437,6 @@ const ValidacionApuestas: React.FC = () => {
           </ScrollView>
       </Card>
 
-      {/* Date Picker */}
-      {showDatePicker && (
-        <DateTimePicker
-          value={selectedDate}
-          mode="date"
-          display="default"
-          onChange={handleDateChange}
-          maximumDate={new Date()}
-        />
-      )}
     </View>
   );
 };
@@ -545,32 +523,6 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.sm,
     borderWidth: 2,
     borderColor: colors.inputBorder,
-  },
-  dateFilter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    marginBottom: spacing.md,
-  },
-  filterLabel: {
-    fontSize: fontSize.sm,
-    fontWeight: fontWeight.semibold,
-    color: colors.primaryGold,
-  },
-  dateButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: colors.darkBackground,
-    borderWidth: 1,
-    borderColor: colors.inputBorder,
-    borderRadius: borderRadius.md,
-    padding: spacing.md,
-  },
-  dateButtonText: {
-    fontSize: fontSize.md,
-    color: colors.lightText,
   },
   filterToggle: {
     flexDirection: 'row',
