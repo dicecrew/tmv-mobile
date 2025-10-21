@@ -68,9 +68,15 @@ const JugadorDashboard: React.FC = () => {
       </View>
 
       {/* Content */}
-      <ScrollView style={styles.content}>
-        {renderContent()}
-      </ScrollView>
+      {activeTab === 'placeBet' ? (
+        <View style={styles.content}>
+          {renderContent()}
+        </View>
+      ) : (
+        <ScrollView style={styles.content}>
+          {renderContent()}
+        </ScrollView>
+      )}
     </View>
   );
 };
@@ -113,6 +119,8 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     padding: spacing.sm,
+    minHeight: '100%',
+    paddingBottom: spacing.xl * 3,
   },
   contentCard: {
     minHeight: 200,

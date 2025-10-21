@@ -11,6 +11,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Dimensions,
+  Modal,
 } from 'react-native';
 import Combobox, { ComboboxOption } from '../common/Combobox';
 import { Ionicons } from '@expo/vector-icons';
@@ -63,67 +64,6 @@ const PLAY_TYPE_COLORS: { [key: string]: string } = {
   CENTENA: '#7c3aed',
 };
 
-// Componente de cuenta regresiva
-interface CountdownTimerProps {
-  endTime: string;
-  onTimeUp?: () => void;
-}
-
-const CountdownTimer: React.FC<CountdownTimerProps> = ({ endTime, onTimeUp }) => {
-  const [timeRemaining, setTimeRemaining] = useState<{
-    hours: number;
-    minutes: number;
-    seconds: number;
-    total: number;
-  }>({ hours: 0, minutes: 0, seconds: 0, total: 0 });
-
-  useEffect(() => {
-    const calculateTimeRemaining = () => {
-      try {
-        const now = new Date();
-        const end = new Date(endTime);
-        const difference = end.getTime() - now.getTime();
-
-        if (difference <= 0) {
-          setTimeRemaining({ hours: 0, minutes: 0, seconds: 0, total: 0 });
-          onTimeUp?.();
-          return;
-        }
-
-        const hours = Math.floor(difference / (1000 * 60 * 60));
-        const minutes = Math.floor((difference % (1000 * 60 * 60)) / (1000 * 60));
-        const seconds = Math.floor((difference % (1000 * 60)) / 1000);
-
-        setTimeRemaining({ hours, minutes, seconds, total: difference });
-      } catch (error) {
-        console.error('Error calculating time remaining:', error);
-      }
-    };
-
-    // Calcular inmediatamente
-    calculateTimeRemaining();
-
-    // Actualizar cada segundo
-    const interval = setInterval(calculateTimeRemaining, 1000);
-
-    return () => clearInterval(interval);
-  }, [endTime, onTimeUp]);
-
-  const formatTime = (value: number): string => {
-    return value.toString().padStart(2, '0');
-  };
-
-  // Si el tiempo se agotó, no mostrar nada
-  if (timeRemaining.total <= 0) {
-    return null;
-  }
-
-  return (
-    <Text style={styles.countdownText}>
-      ⏰ {formatTime(timeRemaining.hours)}:{formatTime(timeRemaining.minutes)}:{formatTime(timeRemaining.seconds)}
-    </Text>
-  );
-};
 
 // Función para formatear números con punto decimal
 const formatAmount = (amount: number): string => {
@@ -166,6 +106,7 @@ const RegistrarApuesta: React.FC = () => {
   const [isLoadingThrows, setIsLoadingThrows] = useState(false);
   const [isLoadingPlayTypes, setIsLoadingPlayTypes] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  const [isFloatingModalVisible, setIsFloatingModalVisible] = useState(true);
 
   const [currentTime, setCurrentTime] = useState(new Date());
 
@@ -394,7 +335,7 @@ const RegistrarApuesta: React.FC = () => {
       // Manejo robusto de diferentes formatos de respuesta (homologo al proyecto web)
       if (response) {
         if (Array.isArray(response)) {
-          throwsArray = response;
+        throwsArray = response;
         } else if (response.data) {
           if (Array.isArray(response.data)) {
             throwsArray = response.data;
@@ -402,7 +343,7 @@ const RegistrarApuesta: React.FC = () => {
             // El endpoint active-for-time devuelve un objeto único, no un array
             throwsArray = [response.data];
           } else if (typeof response.data === 'object') {
-            throwsArray = Object.values(response.data);
+        throwsArray = Object.values(response.data);
           }
         } else if (typeof response === 'object' && response.id) {
           // Si response es directamente el objeto de la tirada
@@ -809,13 +750,13 @@ const RegistrarApuesta: React.FC = () => {
         newCurrentNumbers = currentNumbers + num;
       } else {
         // Continuar construyendo el número actual
-        if (currentNumber.length === 2 && num === '0' && 
-            currentNumber !== '10' && currentNumber !== '20' && currentNumber !== '30' && 
-            currentNumber !== '40' && currentNumber !== '50' && currentNumber !== '60' && 
-            currentNumber !== '70' && currentNumber !== '80' && currentNumber !== '90' && 
-            currentNumber !== '00') {
-          return; // No permitir números como 120, 230, etc
-        }
+        // if (currentNumber.length === 2 && num === '0' && 
+        //     currentNumber !== '10' && currentNumber !== '20' && currentNumber !== '30' && 
+        //     currentNumber !== '40' && currentNumber !== '50' && currentNumber !== '60' && 
+        //     currentNumber !== '70' && currentNumber !== '80' && currentNumber !== '90' && 
+        //     currentNumber !== '00') {
+        //   return; // No permitir números como 120, 230, etc
+        // }
         
         if (currentNumber.length >= 3) {
           return; // No permitir más de 3 dígitos
@@ -895,13 +836,13 @@ const RegistrarApuesta: React.FC = () => {
       newCurrentNumbers = currentNumbers + num;
     } else {
         // Continuar construyendo el número actual
-        if (currentNumber.length === 2 && num === '0' && 
-            currentNumber !== '10' && currentNumber !== '20' && currentNumber !== '30' && 
-            currentNumber !== '40' && currentNumber !== '50' && currentNumber !== '60' && 
-            currentNumber !== '70' && currentNumber !== '80' && currentNumber !== '90' && 
-            currentNumber !== '00') {
-          return; // No permitir números como 120, 230, etc
-        }
+        // if (currentNumber.length === 2 && num === '0' && 
+        //     currentNumber !== '10' && currentNumber !== '20' && currentNumber !== '30' && 
+        //     currentNumber !== '40' && currentNumber !== '50' && currentNumber !== '60' && 
+        //     currentNumber !== '70' && currentNumber !== '80' && currentNumber !== '90' && 
+        //     currentNumber !== '00') {
+        //   return; // No permitir números como 120, 230, etc
+        // }
         
       if (currentNumber.length >= 3) {
         return; // No permitir más de 3 dígitos
@@ -955,6 +896,26 @@ const RegistrarApuesta: React.FC = () => {
 
   const addComma = () => {
     if (activeGameTab === 'numeros') {
+      // Si estamos en modo AL, procesar el rango
+      if (isAlMode && alFirstNumber) {
+        const numbers = getIndividualNumbers();
+        if (numbers.length >= 2) {
+          const secondNumber = numbers[numbers.length - 1];
+          const alRange = generateAlRange(alFirstNumber, secondNumber);
+          
+          if (alRange.length > 0) {
+            // Reemplazar los números actuales con el rango AL
+            const alRangeString = alRange.join('\n');
+            setCurrentNumbers(alRangeString);
+            
+            // Desactivar modo AL
+            setIsAlMode(false);
+            setAlFirstNumber('');
+            return;
+          }
+        }
+      }
+      
       const numbers = getIndividualNumbers();
       
       if (numbers.length >= 30) {
@@ -1123,14 +1084,6 @@ const RegistrarApuesta: React.FC = () => {
     
     // Agregar coma después del primer número para permitir escribir el segundo
     setCurrentNumbers(currentNumbers + ',');
-    
-    Toast.show({
-      type: 'success',
-      text1: '🎯 AL activado',
-      text2: `Con ${singleNumber}. Ahora ingresa el segundo número.`,
-      position: 'top',
-      topOffset: 60,
-    });
   };
 
   const generateAlRange = (firstNum: string, secondNum: string): string[] => {
@@ -1139,12 +1092,107 @@ const RegistrarApuesta: React.FC = () => {
     
     if (isNaN(num1) || isNaN(num2)) return [];
     
+    // Números de 3 dígitos (Centenas)
+    if (firstNum.length === 3 && secondNum.length === 3) {
+      const result: string[] = [];
+      
+      // Extraer cada dígito
+      const firstDigits = firstNum.split('');
+      const secondDigits = secondNum.split('');
+      
+      const firstHundred = firstDigits[0]; // Centenas
+      const firstTen = firstDigits[1];     // Decenas  
+      const firstUnit = firstDigits[2];    // Unidades
+      
+      const secondHundred = secondDigits[0]; // Centenas
+      const secondTen = secondDigits[1];     // Decenas
+      const secondUnit = secondDigits[2];    // Unidades
+      
+      // CASO 1: Varía la PRIMERA cifra (CENTENAS)
+      // Condición: Decenas y unidades permanecen fijas
+      if (firstTen === secondTen && firstUnit === secondUnit) {
+        const hundredStart = Math.min(parseInt(firstHundred), parseInt(secondHundred));
+        const hundredEnd = Math.max(parseInt(firstHundred), parseInt(secondHundred));
+        
+        for (let i = hundredStart; i <= hundredEnd; i++) {
+          const number = i.toString() + firstTen + firstUnit;
+          result.push(number);
+        }
+        
+        return result;
+      }
+      
+      // CASO 2: Varía la SEGUNDA cifra (DECENAS)
+      // Condición: Centenas y unidades permanecen fijas
+      if (firstHundred === secondHundred && firstUnit === secondUnit) {
+        const tenStart = Math.min(parseInt(firstTen), parseInt(secondTen));
+        const tenEnd = Math.max(parseInt(firstTen), parseInt(secondTen));
+        
+        for (let i = tenStart; i <= tenEnd; i++) {
+          const number = firstHundred + i.toString() + firstUnit;
+          result.push(number);
+        }
+        
+        return result;
+      }
+      
+      // CASO 3: Varía UNIDADES y/o DECENAS (mantiene centenas fijas)
+      // Condición: Solo centenas permanecen fijas + Rango total < 10 números
+      if (firstHundred === secondHundred) {
+        const firstLastTwo = parseInt(firstNum.substring(1)); // Últimos 2 dígitos
+        const secondLastTwo = parseInt(secondNum.substring(1)); // Últimos 2 dígitos
+        const difference = Math.abs(secondLastTwo - firstLastTwo);
+        
+        // Solo funciona si la diferencia total es < 10
+        if (difference < 10) {
+          const start = Math.min(firstLastTwo, secondLastTwo);
+          const end = Math.max(firstLastTwo, secondLastTwo);
+          
+          for (let i = start; i <= end; i++) {
+            const lastTwoStr = i.toString().padStart(2, '0');
+            const number = firstHundred + lastTwoStr;
+            result.push(number);
+          }
+        } else {
+          // Si la diferencia es >= 10, no generar rango (caso no válido)
+          return [];
+        }
+        
+        return result;
+      }
+      
+      // Si no cumple ninguno de los casos, no generar rango
+      return [];
+    }
+    
     // Números de 2 dígitos
     if (num1 >= 0 && num2 >= 0 && num1 <= 99 && num2 <= 99) {
-      const difference = Math.abs(num2 - num1);
       const result: string[] = [];
       const start = Math.min(num1, num2);
       const end = Math.max(num1, num2);
+      
+      // Verificar si ambos números tienen dígitos iguales
+      const firstDigits = firstNum.split('');
+      const secondDigits = secondNum.split('');
+      const bothHaveEqualDigits = firstDigits.length === 2 && firstDigits[0] === firstDigits[1] &&
+                                 secondDigits.length === 2 && secondDigits[0] === secondDigits[1];
+      
+      if (bothHaveEqualDigits) {
+        // Caso especial: números con dígitos iguales (11, 22, 33, etc.)
+        const firstDigit = parseInt(firstDigits[0]);
+        const secondDigit = parseInt(secondDigits[0]);
+        const digitStart = Math.min(firstDigit, secondDigit);
+        const digitEnd = Math.max(firstDigit, secondDigit);
+        
+        for (let i = digitStart; i <= digitEnd; i++) {
+          const number = i.toString() + i.toString();
+          result.push(number);
+        }
+        
+        return result;
+      }
+      
+      const difference = Math.abs(num2 - num1);
       
       if (difference <= 10) {
         // Completar de uno en uno
@@ -1185,6 +1233,21 @@ const RegistrarApuesta: React.FC = () => {
     }
     
     return [];
+  };
+
+  const getParletCombinations = (numbers: string[]): string[] => {
+    const validNumbers = numbers.filter(num => validateNumberForType(num, 'PARLET'));
+    const combinations: string[] = [];
+    
+    for (let i = 0; i < validNumbers.length; i++) {
+      for (let j = i + 1; j < validNumbers.length; j++) {
+        const firstNum = formatNumberDisplay(validNumbers[i]);
+        const secondNum = formatNumberDisplay(validNumbers[j]);
+        combinations.push(`${firstNum}X${secondNum}`);
+      }
+    }
+    
+    return combinations;
   };
 
   const separatePlay = () => {
@@ -1469,6 +1532,11 @@ const RegistrarApuesta: React.FC = () => {
                 betPlays: betPlays
               };
 
+              console.log('🎯 Datos de apuesta a enviar:', JSON.stringify(betData, null, 2));
+              console.log('🎯 Número de jugadas:', finalPlays.length);
+              console.log('🎯 Throw ID:', selectedThrowId);
+              console.log('🎯 Fecha UTC:', utcDateTime);
+
               await betService.sendUserBetPlay(betData);
 
               const totalAmount = finalPlays.reduce((total, play) => total + play.amount, 0);
@@ -1598,6 +1666,7 @@ const RegistrarApuesta: React.FC = () => {
     }));
 
   return (
+    <View style={styles.mainContainer}>
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -1628,7 +1697,7 @@ const RegistrarApuesta: React.FC = () => {
                   <ActivityIndicator size="small" color="white" />
                 ) : (
                   <>
-                    <Ionicons name="send-outline" size={16} color="white" />
+                    <Ionicons name="send-outline" size={12} color="white" />
                     <Text style={styles.sendButtonText}>Enviar</Text>
                   </>
                 )}
@@ -1656,17 +1725,17 @@ const RegistrarApuesta: React.FC = () => {
                   enabled={!isLoadingLotteries && lotteryOptions.length > 0}
                   style={styles.comboboxStyle}
                 />
-              </View>
-              
+          </View>
+
               {/* Información de Tirada Activa */}
               <View style={styles.throwInfoContainer}>
                 {selectedLotteryId && throws.length > 0 ? (
-                  <View style={styles.activeThrowContainer}>
-                    <Text style={styles.throwName}>
+                  <View style={[styles.activeThrowContainer, { backgroundColor: '#10b981', borderColor: '#059669' }]}>
+                    <Text style={[styles.throwName, { color: 'white' }]}>
                       🎯 {throws[0].name}
                     </Text>
                     {throws[0].endTime && (
-                      <Text style={styles.throwEndTime}>
+                      <Text style={[styles.throwEndTime, { color: 'white', opacity: 0.9 }]}>
                         Cierra: {convertUtcTimeToLocal(throws[0].endTime)}
                       </Text>
                     )}
@@ -1681,34 +1750,13 @@ const RegistrarApuesta: React.FC = () => {
               </View>
               </View>
 
-            {/* Contador de tiempo */}
-            <View style={styles.bottomActionContainer}>
-              {/* Estado de tirada con tiempo restante */}
-              {throwStatus && throws.length > 0 && (
-                <View style={[styles.statusBadge, { backgroundColor: throwStatus.color }]}>
-                  <Text style={styles.statusText}>{throwStatus.text}</Text>
-                  {throws[0].endTime && (
-                    <CountdownTimer 
-                      endTime={throws[0].endTime}
-                      onTimeUp={() => {
-                        console.log('⏰ Tiempo agotado para la tirada');
-                        // Recargar throws cuando el tiempo se agote
-                        if (selectedLotteryId) {
-                          loadThrows(selectedLotteryId);
-                        }
-                      }}
-                    />
-                  )}
-                </View>
-              )}
-            </View>
           </View>
 
-          {/* Indicador de modo AL */}
+          {/* Indicador temporal de modo AL */}
           {isAlMode && (
             <View style={styles.alIndicator}>
               <Text style={styles.alText}>
-                🎯 AL activo: {alFirstNumber} → Ingresa el segundo número
+                🎯 AL activo: {alFirstNumber} → Ingresa el segundo número y presiona Enter
               </Text>
             </View>
           )}
@@ -1722,7 +1770,7 @@ const RegistrarApuesta: React.FC = () => {
                 onPress={() => setActiveGameTab('numeros')}
         >
                 <Text style={[styles.tableHeaderText, activeGameTab === 'numeros' && styles.tableHeaderTextActive]}>
-                  🔢 Números
+                  Números
                 </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -1730,7 +1778,7 @@ const RegistrarApuesta: React.FC = () => {
                 onPress={() => setActiveGameTab('fijo')}
         >
                 <Text style={[styles.tableHeaderText, selectedTypes.includes('Fijo') && styles.tableHeaderTextSelected]}>
-                  🎯 Fijo
+                  Fijo
                 </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -1738,7 +1786,7 @@ const RegistrarApuesta: React.FC = () => {
                 onPress={() => setActiveGameTab('corrido')}
               >
                 <Text style={[styles.tableHeaderText, selectedTypes.includes('Corrido') && styles.tableHeaderTextSelected]}>
-                  🎲 Corrido
+                  Corrido
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -1746,7 +1794,7 @@ const RegistrarApuesta: React.FC = () => {
                 onPress={() => setActiveGameTab('centena')}
               >
                 <Text style={[styles.tableHeaderText, selectedTypes.includes('Centena') && styles.tableHeaderTextSelected]}>
-                  🎯 Centena
+                  Centena
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -1754,7 +1802,7 @@ const RegistrarApuesta: React.FC = () => {
                 onPress={() => setActiveGameTab('parlet')}
               >
                 <Text style={[styles.tableHeaderText, selectedTypes.includes('Parlet') && styles.tableHeaderTextSelected]}>
-                  🎯 Parlet
+                  Parlet
                 </Text>
         </TouchableOpacity>
       </View>
@@ -1862,7 +1910,6 @@ const RegistrarApuesta: React.FC = () => {
                 addNumber(e.nativeEvent.key);
               }
             }}
-            autoFocus
             autoComplete="off"
             autoCorrect={false}
             autoCapitalize="none"
@@ -1876,7 +1923,7 @@ const RegistrarApuesta: React.FC = () => {
               <Text style={styles.playsSectionTitle}>
                 🎯 JUGADAS REGISTRADAS ({allPlays.length})
             </Text>
-              <ScrollView style={styles.playsList} nestedScrollEnabled>
+              <View style={styles.playsList}>
                 {allPlays.map((play) => (
                   <View key={play.id} style={styles.playItem}>
                     <View style={styles.playItemContent}>
@@ -1912,7 +1959,8 @@ const RegistrarApuesta: React.FC = () => {
 
                       {/* Mostrar detalles por tipo */}
                       {play.validPlays.map((validPlay, idx) => (
-                        <View key={idx} style={styles.playTypeDetails}>
+                        <View key={idx} style={styles.playTypeDetailsContainer}>
+                          <View style={styles.playTypeDetails}>
                           <Text style={[styles.playTypeName, { color: PLAY_TYPE_COLORS[validPlay.type] || colors.primaryGold }]}>
                             {validPlay.type}:
                           </Text>
@@ -1925,6 +1973,21 @@ const RegistrarApuesta: React.FC = () => {
                           <Text style={styles.playTypeAmount}>
                             ${formatAmount(validPlay.totalCost)} USD
                           </Text>
+                          </View>
+                          
+                          {/* Mostrar combinaciones específicas para Parlet */}
+                          {validPlay.type === 'Parlet' && validPlay.combinations && validPlay.combinations.length > 0 && (
+                            <View style={styles.parletCombinationsContainer}>
+                              <Text style={styles.parletCombinationsLabel}>🎰 Combinaciones:</Text>
+                              <View style={styles.parletCombinationsList}>
+                                {validPlay.combinations.map((combination, comboIdx) => (
+                                  <View key={comboIdx} style={styles.parletCombinationBadge}>
+                                    <Text style={styles.parletCombinationText}>{combination}</Text>
+                                  </View>
+                                ))}
+                              </View>
+                            </View>
+                          )}
     </View>
                       ))}
                       
@@ -1934,34 +1997,55 @@ const RegistrarApuesta: React.FC = () => {
                     </View>
                   </View>
                 ))}
-              </ScrollView>
+              </View>
             </View>
           )}
 
+        </Card>
+              </ScrollView>
+      </KeyboardAvoidingView>
+      
+      {/* Botón flotante para mostrar modal cuando está oculto - POSICIONADO ABSOLUTAMENTE RESPECTO A LA PANTALLA */}
+      {!isFloatingModalVisible && (
+        <View style={styles.floatingButtonOverlay}>
+          <TouchableOpacity
+            style={styles.showModalButton}
+            onPress={() => setIsFloatingModalVisible(true)}
+          >
+            <Ionicons name="keypad-outline" size={24} color="white" />
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Modal Flotante con Botones - POSICIONADO ABSOLUTAMENTE RESPECTO A LA PANTALLA */}
+      {isFloatingModalVisible && (
+        <View style={styles.floatingModalContainer}>
+          <View style={styles.floatingModalContent}>
+
           {/* Botones de Tipos de Juego */}
-          <View style={styles.typesGrid}>
+            <View style={styles.floatingTypesGrid} pointerEvents="auto">
             {playTypes.map(type => {
               const isAvailable = availableTypes.includes(type.name);
                 return (
                   <TouchableOpacity
                     key={type.id}
                     style={[
-                      styles.typeButton,
-                    selectedTypes.includes(type.name) && styles.typeButtonSelected,
+                      styles.floatingTypeButton,
+                      selectedTypes.includes(type.name) && styles.floatingTypeButtonSelected,
                     selectedTypes.includes(type.name) && {
                       backgroundColor: PLAY_TYPE_COLORS[type.name] || colors.primaryGold,
                       borderColor: PLAY_TYPE_COLORS[type.name] || colors.primaryGold,
                     },
-                    !isAvailable && styles.typeButtonDisabled
+                      !isAvailable && styles.floatingTypeButtonDisabled
                   ]}
                   onPress={() => toggleType(type.name)}
                     disabled={!isAvailable}
                   >
                   <Text
                     style={[
-                      styles.typeButtonText,
-                      selectedTypes.includes(type.name) && styles.typeButtonTextSelected,
-                      !isAvailable && styles.typeButtonTextDisabled
+                        styles.floatingTypeButtonText,
+                        selectedTypes.includes(type.name) && styles.floatingTypeButtonTextSelected,
+                        !isAvailable && styles.floatingTypeButtonTextDisabled
                     ]}
                   >
                           {type.name}
@@ -1972,66 +2056,66 @@ const RegistrarApuesta: React.FC = () => {
           </View>
 
           {/* Teclado numérico */}
-          <View style={styles.keyboard}>
-            <View style={styles.keyboardRow}>
+            <View style={styles.floatingKeyboard} pointerEvents="auto">
+              <View style={styles.floatingKeyboardRow}>
               {['7', '8', '9'].map(num => (
                 <TouchableOpacity
                   key={num}
-                  style={styles.numberKey}
+                    style={styles.floatingNumberKey}
                   onPress={() => addNumber(num)}
                 >
-                  <Text style={styles.numberKeyText}>{num}</Text>
+                    <Text style={styles.floatingNumberKeyText}>{num}</Text>
                 </TouchableOpacity>
               ))}
                     </View>
-            <View style={styles.keyboardRow}>
+              <View style={styles.floatingKeyboardRow}>
               {['4', '5', '6'].map(num => (
                 <TouchableOpacity
                   key={num}
-                  style={styles.numberKey}
+                    style={styles.floatingNumberKey}
                   onPress={() => addNumber(num)}
                 >
-                  <Text style={styles.numberKeyText}>{num}</Text>
+                    <Text style={styles.floatingNumberKeyText}>{num}</Text>
                 </TouchableOpacity>
                   ))}
                 </View>
-            <View style={styles.keyboardRow}>
+              <View style={styles.floatingKeyboardRow}>
               {['1', '2', '3'].map(num => (
                 <TouchableOpacity
                   key={num}
-                  style={styles.numberKey}
+                    style={styles.floatingNumberKey}
                   onPress={() => addNumber(num)}
                 >
-                  <Text style={styles.numberKeyText}>{num}</Text>
+                    <Text style={styles.floatingNumberKeyText}>{num}</Text>
                 </TouchableOpacity>
               ))}
               </View>
-            <View style={styles.keyboardRow}>
+              <View style={styles.floatingKeyboardRow}>
               <TouchableOpacity
-                style={styles.numberKey}
+                  style={styles.floatingNumberKey}
                 onPress={addDecimalPoint}
               >
-                <Text style={styles.numberKeyText}>.</Text>
+                  <Text style={styles.floatingNumberKeyText}>.</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={styles.numberKey}
+                  style={styles.floatingNumberKey}
                 onPress={() => addNumber('0')}
               >
-                <Text style={styles.numberKeyText}>0</Text>
+                  <Text style={styles.floatingNumberKeyText}>0</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={styles.numberKey}
+                  style={styles.floatingNumberKey}
                 onPress={backspace}
               >
-                <Text style={styles.numberKeyText}>←</Text>
+                  <Text style={styles.floatingNumberKeyText}>←</Text>
               </TouchableOpacity>
                       </View>
               </View>
               
           {/* Botones de acción */}
-          <View style={styles.actionButtons}>
+            <View style={styles.floatingActionButtons} pointerEvents="auto">
             <TouchableOpacity
-              style={[styles.actionButton, styles.copyButton]}
+                style={[styles.floatingActionButton, styles.floatingCopyButton]}
               onPress={() => {
                 // Función para copiar monto a todos los números
                 const numbers = getIndividualNumbers();
@@ -2061,55 +2145,79 @@ const RegistrarApuesta: React.FC = () => {
               }}
               disabled={availableTypes.length === 0}
             >
-              <Text style={styles.actionButtonText}>Todos</Text>
+                <Text style={styles.floatingActionButtonText}>Todos</Text>
             </TouchableOpacity>
               
               <TouchableOpacity
-              style={[styles.actionButton, styles.alButton]}
+                style={[styles.floatingActionButton, styles.floatingAlButton]}
               onPress={applyAl}
               disabled={getIndividualNumbers().length !== 1}
             >
-              <Text style={styles.actionButtonText}>AL</Text>
+                <Text style={styles.floatingActionButtonText}>AL</Text>
               </TouchableOpacity>
             
         <TouchableOpacity
-              style={[styles.actionButton, styles.enterButton]}
+                style={[styles.floatingActionButton, styles.floatingEnterButton]}
               onPress={addComma}
             >
-              <Text style={styles.actionButtonText}>Enter</Text>
+                <Text style={styles.floatingActionButtonText}>Enter</Text>
         </TouchableOpacity>
           </View>
         
           {/* Botones Eliminar y Separar Jugada */}
-          <View style={styles.bottomButtons}>
+            <View style={styles.floatingBottomButtons} pointerEvents="auto">
         <TouchableOpacity
-              style={[styles.actionButton, styles.clearButton]}
+                style={[styles.floatingActionButton, styles.floatingClearButton]}
               onPress={clearAll}
               disabled={!currentNumbers && allPlays.length === 0}
             >
-              <Text style={styles.actionButtonText}>🗑️ Eliminar</Text>
+                <Text style={styles.floatingActionButtonText}>🗑️ Eliminar</Text>
         </TouchableOpacity>
         
         <TouchableOpacity
-              style={[styles.actionButton, styles.separateButton]}
+                style={[styles.floatingActionButton, styles.floatingSeparateButton]}
               onPress={separatePlay}
               disabled={!currentNumbers || selectedTypes.length === 0 || calculateCurrentAmount() <= 0}
             >
-              <Text style={styles.actionButtonText}>🎯 Separar Jugada</Text>
+                <Text style={styles.floatingActionButtonText}>🎯 Separar Jugada</Text>
         </TouchableOpacity>
       </View>
-        </Card>
-      </ScrollView>
-    </KeyboardAvoidingView>
+
+            {/* Botón para ocultar/mostrar modal */}
+            <TouchableOpacity
+              style={styles.floatingToggleButton}
+              onPress={() => setIsFloatingModalVisible(!isFloatingModalVisible)}
+            >
+              <Ionicons 
+                name={isFloatingModalVisible ? "chevron-down" : "chevron-up"} 
+                size={20} 
+                color={colors.primaryGold} 
+              />
+            </TouchableOpacity>
+
+          </View>
+        </View>
+      )}
+      
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
+  mainContainer: {
+    flex: 1,
+    position: 'relative',
+  },
   container: {
+    flex: 1,
+  },
+  keyboardAvoidingView: {
     flex: 1,
   },
   scrollView: {
     flex: 1,
+    zIndex: 1,
+    paddingBottom: 100, // Espacio para el botón flotante
   },
   headerContainer: {
     marginBottom: spacing.md,
@@ -2158,7 +2266,7 @@ const styles = StyleSheet.create({
   sendButton: {
     borderRadius: borderRadius.sm,
     overflow: 'hidden',
-    minWidth: 80,
+    minWidth: 60,
   },
   sendButtonDisabled: {
     opacity: 0.5,
@@ -2168,11 +2276,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: spacing.xs,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm,
   },
   sendButtonText: {
-    fontSize: fontSize.sm,
+    fontSize: fontSize.xs,
     fontWeight: fontWeight.bold,
     color: 'white',
   },
@@ -2191,6 +2299,7 @@ const styles = StyleSheet.create({
     color: colors.primaryGold,
   },
   unifiedTable: {
+    marginHorizontal: -spacing.md,
     marginBottom: spacing.md,
     borderRadius: borderRadius.md,
     overflow: 'hidden',
@@ -2293,7 +2402,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   playsList: {
-    maxHeight: 200,
+    // Sin maxHeight para que sea parte del scroll principal
   },
   playItem: {
     backgroundColor: colors.inputBackground,
@@ -2376,11 +2485,41 @@ const styles = StyleSheet.create({
     color: colors.primaryGold,
     fontFamily: 'monospace',
   },
+  playTypeDetailsContainer: {
+    marginBottom: spacing.sm,
+  },
   playTypeDetails: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
     marginBottom: spacing.xs,
+  },
+  parletCombinationsContainer: {
+    marginTop: spacing.xs,
+    paddingLeft: spacing.sm,
+  },
+  parletCombinationsLabel: {
+    fontSize: fontSize.xs,
+    fontWeight: fontWeight.medium,
+    color: colors.primaryGold,
+    marginBottom: spacing.xs,
+  },
+  parletCombinationsList: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.xs,
+  },
+  parletCombinationBadge: {
+    backgroundColor: '#dc2626',
+    borderRadius: 4,
+    paddingHorizontal: spacing.xs,
+    paddingVertical: 2,
+  },
+  parletCombinationText: {
+    fontSize: fontSize.xs,
+    fontWeight: fontWeight.bold,
+    color: 'white',
+    fontFamily: 'monospace',
   },
   playTypeName: {
     fontSize: fontSize.xs,
@@ -2571,6 +2710,227 @@ const styles = StyleSheet.create({
     color: 'white',
     fontFamily: 'monospace',
     marginTop: spacing.xs,
+  },
+  // Estilos del Modal Flotante
+  floatingModalContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'transparent',
+    zIndex: 999,
+    height: '100%',
+    width: '100%',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    pointerEvents: 'box-none',
+  },
+  floatingModalContent: {
+    backgroundColor: 'transparent',
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.xl,
+    paddingHorizontal: spacing.md,
+    width: '100%',
+    marginBottom: 20,
+    pointerEvents: 'auto',
+  },
+  floatingTypesGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.xs,
+    marginBottom: spacing.sm,
+    backgroundColor: colors.darkBackground,
+    borderTopWidth: 2,
+    borderTopColor: colors.primaryGold,
+    borderTopLeftRadius: borderRadius.lg,
+    borderTopRightRadius: borderRadius.lg,
+    padding: spacing.sm,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: -4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 10,
+  },
+  floatingTypeButton: {
+    flex: 1,
+    minWidth: '22%',
+    backgroundColor: colors.darkBackground,
+    borderWidth: 1,
+    borderColor: colors.inputBorder,
+    borderRadius: borderRadius.sm,
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.xs,
+    alignItems: 'center',
+  },
+  floatingTypeButtonSelected: {
+    borderWidth: 2,
+  },
+  floatingTypeButtonDisabled: {
+    opacity: 0.4,
+  },
+  floatingTypeButtonText: {
+    fontSize: fontSize.xs,
+    fontWeight: fontWeight.bold,
+    color: colors.lightText,
+  },
+  floatingTypeButtonTextSelected: {
+    color: 'white',
+  },
+  floatingTypeButtonTextDisabled: {
+    color: colors.subtleGrey,
+  },
+  floatingKeyboard: {
+    marginBottom: spacing.sm,
+    backgroundColor: colors.darkBackground,
+    padding: spacing.sm,
+    borderRadius: borderRadius.md,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  floatingKeyboardRow: {
+    flexDirection: 'row',
+    gap: spacing.xs,
+    marginBottom: spacing.xs,
+  },
+  floatingNumberKey: {
+    flex: 1,
+    backgroundColor: colors.darkBackground,
+    borderWidth: 1,
+    borderColor: colors.inputBorder,
+    borderRadius: borderRadius.sm,
+    paddingVertical: spacing.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 40,
+  },
+  floatingNumberKeyText: {
+    fontSize: fontSize.md,
+    fontWeight: fontWeight.heavy,
+    color: colors.lightText,
+  },
+  floatingActionButtons: {
+    flexDirection: 'row',
+    gap: spacing.xs,
+    marginBottom: spacing.xs,
+    backgroundColor: colors.darkBackground,
+    padding: spacing.sm,
+    borderRadius: borderRadius.md,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  floatingBottomButtons: {
+    flexDirection: 'row',
+    gap: spacing.xs,
+    marginBottom: spacing.sm,
+    backgroundColor: colors.darkBackground,
+    padding: spacing.sm,
+    borderRadius: borderRadius.md,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  floatingActionButton: {
+    flex: 1,
+    borderRadius: borderRadius.sm,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 40,
+  },
+  floatingCopyButton: {
+    backgroundColor: colors.primaryGold,
+  },
+  floatingAlButton: {
+    backgroundColor: colors.primaryGold,
+  },
+  floatingEnterButton: {
+    backgroundColor: colors.primaryGold,
+  },
+  floatingClearButton: {
+    backgroundColor: colors.primaryRed,
+  },
+  floatingSeparateButton: {
+    backgroundColor: '#22c55e',
+  },
+  floatingActionButtonText: {
+    fontSize: fontSize.xs,
+    fontWeight: fontWeight.bold,
+    color: 'white',
+  },
+  floatingToggleButton: {
+    position: 'absolute',
+    top: -15,
+    right: 20,
+    backgroundColor: colors.darkBackground,
+    borderWidth: 2,
+    borderColor: colors.primaryGold,
+    borderRadius: 15,
+    width: 30,
+    height: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  floatingButtonOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'transparent',
+    pointerEvents: 'box-none',
+    zIndex: 1000,
+  },
+  showModalButton: {
+    position: 'absolute',
+    bottom: 20,
+    left: Dimensions.get('window').width / 2 - 25, // Centrado horizontalmente en la pantalla completa
+    backgroundColor: colors.primaryGold,
+    borderRadius: 25,
+    width: 50,
+    height: 50,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 20,
+    borderWidth: 2,
+    borderColor: colors.primaryGold,
+    zIndex: 9999,
   },
 });
 

@@ -205,12 +205,17 @@ export const betService = {
     }),
 
   // Enviar apuesta de usuario
-  sendUserBetPlay: (userBetPlayData: any) =>
-    customInstance<any>({
-      url: '/api/Bet/user/bet-play',
+  sendUserBetPlay: (userBetPlayData: any) => {
+    console.log('🎯 betService.sendUserBetPlay - Datos a enviar:', JSON.stringify(userBetPlayData, null, 2));
+    console.log('🎯 betService.sendUserBetPlay - URL correcta según Swagger:', '/api/Bet/user-bet-play');
+    console.log('🎯 betService.sendUserBetPlay - Method:', 'POST');
+    
+    return customInstance<any>({
+      url: '/api/Bet/user-bet-play',
       method: 'POST',
       data: userBetPlayData
-    }),
+    });
+  },
 };
 
 // ===== SERVICIOS DE LOTERÍAS =====

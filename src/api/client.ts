@@ -180,6 +180,18 @@ export const customInstance = <T>(
     console.log('Base URL:', baseURL);
   }
 
+  // Debug logging para user-bet-play
+  if (finalConfig.url?.includes('user-bet-play')) {
+    console.log('🔍 Debug user-bet-play request:');
+    console.log('URL completa:', finalConfig.url);
+    console.log('Method:', finalConfig.method);
+    console.log('Data:', finalConfig.data);
+    console.log('Data type:', typeof finalConfig.data);
+    console.log('Data stringified:', JSON.stringify(finalConfig.data));
+    console.log('Headers:', finalConfig.headers);
+    console.log('Base URL:', baseURL);
+  }
+
   return axiosInstance(finalConfig);
 };
 
