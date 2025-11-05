@@ -204,6 +204,16 @@ export const betService = {
       method: 'GET'
     }),
 
+  // Obtener apuestas del usuario por rango de fechas
+  getUserBetsRange: (params: { from: string; to: string }) =>
+    customInstance<any>({
+      url: `/api/Bet/user/range`,
+      method: 'GET',
+      params: {
+        ...params
+      }
+    }),
+
   // Enviar apuesta de usuario
   sendUserBetPlay: (userBetPlayData: any) => {
     console.log('🎯 betService.sendUserBetPlay - Datos a enviar:', JSON.stringify(userBetPlayData, null, 2));

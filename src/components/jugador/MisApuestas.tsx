@@ -56,6 +56,7 @@ const MisApuestas: React.FC = () => {
   const [bets, setBets] = useState<Bet[]>([]);
   const [expandedDate, setExpandedDate] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
 
   // Cargar apuestas del usuario
   const loadUserBets = async () => {
@@ -74,11 +75,14 @@ const MisApuestas: React.FC = () => {
         to: to.toISOString(),
       };
 
-      const response = await betService.getUserBetsRange(user.id, params);
+      const response = await betService.getUserBetsRange(params);
+      console.log('🎯 Respuesta completa del endpoint /api/Bet/user/range:', JSON.stringify(response, null, 2));
 
       // Procesar respuesta para aplanar estructura
       const flattenedBets: Bet[] = [];
       const apiData = response?.data || response;
+
+      console.log('🎯 Datos de la API procesados:', JSON.stringify(apiData, null, 2));
 
       if (apiData && apiData.lotteries) {
         apiData.lotteries.forEach((lottery: any) => {
@@ -94,10 +98,24 @@ const MisApuestas: React.FC = () => {
             });
           });
         });
+      } else {
+        console.warn('⚠️ Estructura de respuesta inesperada:', apiData);
+        // Intentar procesar como array directo de apuestas
+        if (Array.isArray(apiData)) {
+          apiData.forEach((bet: any) => {
+            flattenedBets.push({
+              ...bet,
+              lotteryName: bet.lotteryName || 'Lotería desconocida',
+              throwName: bet.throwName || 'Tirada desconocida',
+          });
+        });
+        }
       }
 
+      console.log('🎯 Apuestas procesadas:', flattenedBets.length, flattenedBets);
       setBets(flattenedBets);
       setShowHistory(true);
+      setShowFilters(false); // Ocultar filtros después de buscar
     } catch (error) {
       console.error('Error loading bets:', error);
       Toast.show({
@@ -148,17 +166,47 @@ const MisApuestas: React.FC = () => {
   const getDateSummary = (dateBets: Bet[]) => {
     let totalAmount = 0;
     let totalProfit = 0;
+    let totalMoves = 0;
+    let wonBets = 0;
+    let lostBets = 0;
+    let pendingBets = 0;
 
     dateBets.forEach((bet) => {
+      // Contar estados de apuestas
+      switch (bet.stateCode) {
+        case 'WON':
+        case 'Approved':
+        case 'PAID':
+          wonBets++;
+          break;
+        case 'LOST':
+          lostBets++;
+          break;
+        case 'PENDING':
+        case 'ACTIVE':
+        case 'New':
+          pendingBets++;
+          break;
+      }
+
       bet.betPlays?.forEach((betPlay) => {
         betPlay.moves?.forEach((move) => {
           totalAmount += move.totalAmount || 0;
           totalProfit += move.profit || 0;
+          totalMoves++;
         });
       });
     });
 
-    return { totalAmount, totalProfit, totalBets: dateBets.length };
+    return { 
+      totalAmount, 
+      totalProfit, 
+      totalBets: dateBets.length,
+      totalMoves,
+      wonBets,
+      lostBets,
+      pendingBets
+    };
   };
 
   // Formatear fecha
@@ -179,6 +227,24 @@ const MisApuestas: React.FC = () => {
       month: 'long', 
         day: 'numeric',
       });
+    }
+  };
+
+  // Formatear fecha corta para jugadas
+  const formatShortDate = (dateString: string): string => {
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) {
+        return dateString; // Si no se puede parsear, devolver el string original
+      }
+      return date.toLocaleDateString('es-ES', {
+        year: '2-digit',
+        month: '2-digit',
+        day: '2-digit'
+      });
+    } catch (error) {
+      console.error('Error formateando fecha corta:', error);
+      return dateString;
     }
   };
 
@@ -257,27 +323,52 @@ const MisApuestas: React.FC = () => {
     setExpandedDate(null);
   };
     
+    // Calcular resúmenes generales
+  const totalJugadas = bets.length;
+  const totalApostado = bets.reduce((total, bet) => {
+    return total + (bet.betPlays?.reduce((playTotal, play) => 
+      playTotal + (play.moves?.reduce((moveTotal, move) => moveTotal + (move.totalAmount || 0), 0) || 0), 0) || 0);
+  }, 0);
+  const totalGanado = bets.reduce((total, bet) => {
+    return total + (bet.betPlays?.reduce((playTotal, play) => 
+      playTotal + (play.moves?.reduce((moveTotal, move) => moveTotal + (move.profit || 0), 0) || 0), 0) || 0);
+  }, 0);
+    
     return (
     <View style={styles.container}>
-      <Card title="Mis Apuestas" icon="receipt-outline" style={styles.card}>
-        <Text style={styles.description}>Consulta el historial de tus apuestas y resultados.</Text>
+      {/* Header */}
+      <View style={styles.header}>
+        <View style={styles.headerLeft}>
+          <Ionicons name="time-outline" size={24} color={colors.primaryGold} />
+          <Text style={styles.headerTitle}>Mis Jugadas</Text>
+        </View>
+        <TouchableOpacity 
+          style={styles.filtersButton}
+          onPress={() => setShowFilters(!showFilters)}
+        >
+          <Ionicons name="options-outline" size={20} color={colors.primaryGold} />
+          <Text style={styles.filtersButtonText}>FILTROS</Text>
+                </TouchableOpacity>
+            </View>
 
-        {/* Filtros */}
-        {!showHistory && (
-          <View style={styles.filtersSection}>
-            <DateRangePicker
-              dateFrom={fromDate}
-              dateTo={toDate}
-              onDateFromChange={setFromDate}
-              onDateToChange={setToDate}
-              onRangeChange={handleDateRangeChange}
-              label="Rango de Fechas"
-              maximumDate={new Date()}
-              dateFormat="short"
-              showLabels={true}
-              required={true}
-              helpText="Selecciona el rango de fechas para consultar tus apuestas"
-            />
+      <Text style={styles.description}>Revisa tus jugadas anteriores y su estado.</Text>
+
+      {/* Filtros */}
+      {showFilters && (
+        <View style={styles.filtersSection}>
+          <DateRangePicker
+            dateFrom={fromDate}
+            dateTo={toDate}
+            onDateFromChange={setFromDate}
+            onDateToChange={setToDate}
+            onRangeChange={handleDateRangeChange}
+            label="Rango de Fechas"
+            maximumDate={new Date()}
+            dateFormat="short"
+            showLabels={true}
+            required={true}
+            helpText="Selecciona el rango de fechas para consultar tus apuestas"
+          />
             
             <TouchableOpacity
               style={styles.searchButton}
@@ -296,18 +387,31 @@ const MisApuestas: React.FC = () => {
           </View>
         )}
 
+      {/* Tarjetas de Resumen */}
+      <View style={styles.summaryCards}>
+        <View style={[styles.summaryCard, styles.summaryCardYellow]}>
+          <Ionicons name="dice-outline" size={24} color={colors.darkBackground} />
+          <Text style={styles.summaryCardLabel}>TOTAL JUGADAS</Text>
+          <Text style={styles.summaryCardValue}>{totalJugadas}</Text>
+        </View>
+        
+        <View style={[styles.summaryCard, styles.summaryCardRed]}>
+          <Ionicons name="wallet-outline" size={24} color={colors.darkBackground} />
+          <Text style={styles.summaryCardLabel}>TOTAL APOSTADO</Text>
+          <Text style={styles.summaryCardValue}>${formatAmount(totalApostado)}</Text>
+        </View>
+        
+        <View style={[styles.summaryCard, styles.summaryCardGreen]}>
+          <Ionicons name="trophy-outline" size={24} color={colors.darkBackground} />
+          <Text style={styles.summaryCardLabel}>TOTAL GANADO</Text>
+          <Text style={styles.summaryCardValue}>${formatAmount(totalGanado)}</Text>
+        </View>
+      </View>
+
+
         {/* Resultados */}
         {showHistory && (
           <View style={styles.historySection}>
-            <View style={styles.historyHeader}>
-              <Text style={styles.historyTitle}>
-                {Object.keys(groupedBets).length} fecha{Object.keys(groupedBets).length !== 1 ? 's' : ''}
-              </Text>
-              <TouchableOpacity style={styles.clearButton} onPress={handleClearFilters}>
-                <Ionicons name="close-outline" size={20} color={colors.primaryRed} />
-              </TouchableOpacity>
-            </View>
-            
             {isLoading && (
               <View style={styles.loadingContainer}>
                 <ActivityIndicator size="large" color={colors.primaryGold} />
@@ -328,73 +432,120 @@ const MisApuestas: React.FC = () => {
                 const isExpanded = expandedDate === dateKey;
 
   return (
-                  <View key={dateKey} style={styles.dateCard}>
-                    <TouchableOpacity
-                      style={styles.dateHeader}
+                <View key={dateKey}>
+                  {/* Agrupación por Fecha */}
+                  <View style={styles.dateGroupHeader}>
+                    <View style={styles.dateGroupButton}>
+                      <Ionicons name="calendar-outline" size={20} color={colors.darkBackground} />
+                      <Text style={styles.dateGroupText}>{formatDate(dateKey)}</Text>
+                    </View>
+                    <Text style={styles.dateGroupCount}>
+                      {summary.totalBets} jugada{summary.totalBets !== 1 ? 's' : ''}
+                    </Text>
+                    <TouchableOpacity 
+                      style={styles.hideButton}
                       onPress={() => setExpandedDate(isExpanded ? null : dateKey)}
                     >
-                      <View style={styles.dateHeaderLeft}>
-                        <Text style={styles.dateTitle}>{formatDate(dateKey)}</Text>
-                        <Text style={styles.dateStats}>
-                          {summary.totalBets} apuesta{summary.totalBets !== 1 ? 's' : ''} · $
-                          {formatAmount(summary.totalAmount)}
-                        </Text>
-                      </View>
-                      <View style={styles.dateHeaderRight}>
-                        <Text
-                          style={[
-                            styles.dateProfit,
-                            summary.totalProfit >= 0 ? styles.profitPositive : styles.profitNegative,
-                          ]}
-                        >
-                          ${formatAmount(summary.totalProfit)}
-                        </Text>
-                        <Ionicons
-                          name={isExpanded ? 'chevron-up' : 'chevron-down'}
-                          size={24}
-                          color={colors.primaryGold}
-                        />
-          </View>
+                      <Ionicons 
+                        name={isExpanded ? 'chevron-up' : 'chevron-down'} 
+                        size={20} 
+                        color={colors.darkBackground} 
+                      />
                     </TouchableOpacity>
+                  </View>
 
+                  {/* Detalles de Apuestas */}
                     {isExpanded && (
-                      <View style={styles.dateDetails}>
+                    <View style={styles.betsContainer}>
                         {dateBets.map((bet) => (
-                          <View key={bet.id} style={styles.betItem}>
-                            <View style={styles.betItemHeader}>
-                              <View style={styles.betItemHeaderLeft}>
-                                <Text style={styles.betLottery}>
-                                  {bet.lotteryName} - {bet.throwName}
-                                </Text>
-                                <Text style={styles.betDate}>
-                                  {new Date(bet.date).toLocaleTimeString()}
+                        <View key={bet.id} style={styles.betCard}>
+                          {/* Header de la Apuesta */}
+                          <View style={styles.betCardHeader}>
+                            <View style={styles.betCardHeaderLeft}>
+                              <Ionicons name="business-outline" size={16} color={colors.lightText} />
+                              <Text style={styles.betCardTitle}>
+                                {bet.lotteryName} • {bet.throwName} • {bet.id}
             </Text>
           </View>
-                              <View
-                                style={[
-                                  styles.statusBadge,
-                                  { backgroundColor: getStatusColor(bet.stateCode) },
-                                ]}
-                              >
-                                <Text style={styles.statusText}>
-                                  {getStatusIcon(bet.stateCode)} {getBetStatus(bet)}
+                            <View style={styles.betCardStatus}>
+                              <Ionicons name="help-circle-outline" size={16} color={colors.lightText} />
+                              <Text style={styles.betCardStatusText}>{getBetStatus(bet)}</Text>
+                            </View>
+                          </View>
+
+                          {/* Estado y Fechas */}
+                          <View style={styles.betCardInfo}>
+                            <View style={styles.betCardStatusBadge}>
+                              <Text style={styles.betCardStatusBadgeText}>Sin resultados</Text>
+                            </View>
+                            <Text style={styles.betCardDate}>
+                              Fecha: {formatShortDate(bet.date)} {new Date(bet.date).toLocaleTimeString('es-ES')}
             </Text>
+                            <Text style={styles.betCardCloseTime}>
+                              Hora de Cierre: {new Date(bet.date).toLocaleTimeString('es-ES')}
+                            </Text>
+                            <View style={styles.betCardThrowStatus}>
+                              <Text style={styles.betCardThrowStatusLabel}>Estado Tirada:</Text>
+                              <Ionicons name="hourglass-outline" size={16} color={colors.primaryGold} />
+                              <Text style={styles.betCardThrowStatusText}>Pendiente</Text>
                               </View>
           </View>
           
-                            {bet.betPlays?.map((betPlay, idx) => (
-                              <View key={idx} style={styles.betPlayItem}>
-                                <Text style={styles.betPlayType}>{betPlay.playTypeName}</Text>
-                                {betPlay.moves?.map((move, moveIdx) => (
-                                  <View key={moveIdx} style={styles.moveItem}>
-                                    <Text style={styles.moveNumbers}>{move.numbers || 'N/A'}</Text>
-                                    <Text style={styles.moveAmount}>
-                                      ${formatAmount(move.totalAmount)}
-            </Text>
+                          {/* Sección JUGADAS */}
+                          <View style={styles.jugadasSection}>
+                            <View style={styles.jugadasHeader}>
+                              <Ionicons name="dice-outline" size={16} color={colors.subtleGrey} />
+                              <Text style={styles.jugadasTitle}>JUGADAS</Text>
+                            </View>
+
+                            {bet.betPlays?.map((betPlay, idx) => {
+                              const playTotal = betPlay.moves?.reduce((total, move) => total + (move.totalAmount || 0), 0) || 0;
+                              const playProfit = betPlay.moves?.reduce((total, move) => total + (move.profit || 0), 0) || 0;
+                              
+                              return (
+                                <View key={idx} style={styles.jugadaItem}>
+                                  <View style={styles.jugadaHeader}>
+                                    <Text style={styles.jugadaType}>{betPlay.playTypeName}</Text>
+                                    <Text style={styles.jugadaTotal}>Total: ${formatAmount(playTotal)}</Text>
+                                    <Text style={[styles.jugadaProfit, { color: playProfit >= 0 ? '#22c55e' : '#ef4444' }]}>
+                                      Ganancia: ${formatAmount(playProfit)}
+                                    </Text>
                                   </View>
-                                ))}
+                                  
+                                  {betPlay.moves?.map((move, moveIdx) => (
+                                    <View key={moveIdx} style={styles.jugadaMove}>
+                                      <Text style={styles.jugadaMoveType}>{betPlay.playTypeName}</Text>
+                                      <Text style={styles.jugadaMoveNumbers}>{move.numbers || 'N/A'}</Text>
+                                      <Text style={styles.jugadaMoveAmount}>${formatAmount(move.totalAmount || 0)}</Text>
+                                      <Text style={[styles.jugadaMoveProfit, { color: (move.profit || 0) >= 0 ? '#22c55e' : '#ef4444' }]}>
+                                        ${formatAmount(move.profit || 0)}
+                                      </Text>
+                                    </View>
+                                  ))}
                               </View>
-                            ))}
+                              );
+                            })}
+                          </View>
+
+                          {/* Resumen de Apuesta */}
+                          <View style={styles.betSummary}>
+                            <View style={styles.betSummaryLeft}>
+                              <Ionicons name="wallet-outline" size={20} color={colors.darkBackground} />
+                              <Text style={styles.betSummaryLabel}>APOSTADO</Text>
+                              <Text style={styles.betSummaryAmount}>
+                                ${formatAmount(bet.betPlays?.reduce((total, play) => 
+                                  total + (play.moves?.reduce((moveTotal, move) => moveTotal + (move.totalAmount || 0), 0) || 0), 0) || 0)}
+                              </Text>
+                            </View>
+                            <View style={styles.betSummaryRight}>
+                              <Ionicons name="trophy-outline" size={20} color={colors.darkBackground} />
+                              <Text style={styles.betSummaryLabel}>PREMIO</Text>
+                              <Text style={styles.betSummaryAmount}>
+                                ${formatAmount(bet.betPlays?.reduce((total, play) => 
+                                  total + (play.moves?.reduce((moveTotal, move) => moveTotal + (move.profit || 0), 0) || 0), 0) || 0)}
+                              </Text>
+                            </View>
+                          </View>
                           </View>
                         ))}
                       </View>
@@ -404,9 +555,7 @@ const MisApuestas: React.FC = () => {
               })}
             </ScrollView>
           </View>
-        )}
-      </Card>
-      
+      )}
     </View>
   );
 };
@@ -414,18 +563,89 @@ const MisApuestas: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: colors.darkBackground,
   },
-  card: {
-    flex: 1,
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  headerTitle: {
+    fontSize: fontSize.xl,
+    fontWeight: fontWeight.bold,
+    color: colors.primaryGold,
+  },
+  filtersButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    backgroundColor: colors.inputBackground,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.primaryGold,
+  },
+  filtersButtonText: {
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.bold,
+    color: colors.primaryGold,
   },
   description: {
     fontSize: fontSize.sm,
     color: colors.subtleGrey,
     marginBottom: spacing.lg,
+    marginHorizontal: spacing.lg,
     lineHeight: 20,
   },
-  filtersSection: {
+  summaryCards: {
+    flexDirection: 'row',
+    paddingHorizontal: spacing.lg,
     marginBottom: spacing.lg,
+    gap: spacing.sm,
+  },
+  summaryCard: {
+    flex: 1,
+    padding: spacing.md,
+    borderRadius: borderRadius.md,
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  summaryCardYellow: {
+    backgroundColor: '#fbbf24',
+  },
+  summaryCardRed: {
+    backgroundColor: '#ef4444',
+  },
+  summaryCardGreen: {
+    backgroundColor: '#22c55e',
+  },
+  summaryCardLabel: {
+    fontSize: fontSize.xs,
+    fontWeight: fontWeight.bold,
+    color: colors.darkBackground,
+    textAlign: 'center',
+  },
+  summaryCardValue: {
+    fontSize: fontSize.lg,
+    fontWeight: fontWeight.heavy,
+    color: colors.darkBackground,
+  },
+  filtersSection: {
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.lg,
+    padding: spacing.md,
+    backgroundColor: colors.inputBackground,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.inputBorder,
   },
   searchButton: {
     flexDirection: 'row',
@@ -456,11 +676,19 @@ const styles = StyleSheet.create({
     color: colors.primaryGold,
   },
   clearButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
     padding: spacing.sm,
     backgroundColor: colors.darkBackground,
     borderRadius: borderRadius.sm,
     borderWidth: 2,
     borderColor: colors.inputBorder,
+  },
+  clearButtonText: {
+    fontSize: fontSize.xs,
+    fontWeight: fontWeight.bold,
+    color: colors.primaryGold,
   },
   loadingContainer: {
     alignItems: 'center',
@@ -485,6 +713,187 @@ const styles = StyleSheet.create({
   },
   datesList: {
     flex: 1,
+  },
+  dateGroupHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    marginBottom: spacing.sm,
+  },
+  dateGroupButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    backgroundColor: '#fbbf24',
+    borderRadius: borderRadius.md,
+  },
+  dateGroupText: {
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.bold,
+    color: colors.darkBackground,
+  },
+  dateGroupCount: {
+    fontSize: fontSize.sm,
+    color: colors.subtleGrey,
+  },
+  hideButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    backgroundColor: '#fbbf24',
+    borderRadius: borderRadius.md,
+  },
+  hideButtonText: {
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.bold,
+    color: colors.darkBackground,
+  },
+  betsContainer: {
+    paddingHorizontal: spacing.lg,
+    marginBottom: spacing.lg,
+  },
+  betCard: {
+    backgroundColor: colors.inputBackground,
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.inputBorder,
+  },
+  betCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+  },
+  betCardHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    flex: 1,
+  },
+  betCardTitle: {
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.medium,
+    color: colors.lightText,
+  },
+  betCardStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    backgroundColor: colors.darkBackground,
+    borderRadius: borderRadius.sm,
+  },
+  betCardStatusText: {
+    fontSize: fontSize.xs,
+    color: colors.lightText,
+  },
+  betCardInfo: {
+    marginBottom: spacing.sm,
+  },
+  betCardStatusBadge: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    backgroundColor: '#fbbf24',
+    borderRadius: borderRadius.sm,
+    marginBottom: spacing.xs,
+  },
+  betCardStatusBadgeText: {
+    fontSize: fontSize.xs,
+    fontWeight: fontWeight.bold,
+    color: colors.darkBackground,
+  },
+  betCardDate: {
+    fontSize: fontSize.xs,
+    color: colors.subtleGrey,
+    marginBottom: spacing.xs,
+  },
+  betCardCloseTime: {
+    fontSize: fontSize.xs,
+    color: colors.subtleGrey,
+    marginBottom: spacing.xs,
+  },
+  betCardThrowStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  betCardThrowStatusLabel: {
+    fontSize: fontSize.xs,
+    color: colors.subtleGrey,
+  },
+  betCardThrowStatusText: {
+    fontSize: fontSize.xs,
+    fontWeight: fontWeight.bold,
+    color: colors.primaryGold,
+  },
+  jugadasSection: {
+    marginBottom: spacing.md,
+  },
+  jugadasHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    marginBottom: spacing.sm,
+  },
+  jugadasTitle: {
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.bold,
+    color: colors.subtleGrey,
+  },
+  jugadaItem: {
+    marginBottom: spacing.sm,
+  },
+  jugadaHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.xs,
+  },
+  jugadaType: {
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.bold,
+    color: '#22c55e',
+  },
+  jugadaTotal: {
+    fontSize: fontSize.xs,
+    color: colors.subtleGrey,
+  },
+  jugadaProfit: {
+    fontSize: fontSize.xs,
+    fontWeight: fontWeight.bold,
+  },
+  jugadaMove: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.xs,
+  },
+  jugadaMoveType: {
+    fontSize: fontSize.xs,
+    fontWeight: fontWeight.bold,
+    color: '#22c55e',
+  },
+  jugadaMoveNumbers: {
+    fontSize: fontSize.xs,
+    color: colors.subtleGrey,
+  },
+  jugadaMoveAmount: {
+    fontSize: fontSize.xs,
+    color: colors.subtleGrey,
+  },
+  jugadaMoveProfit: {
+    fontSize: fontSize.xs,
+    fontWeight: fontWeight.bold,
   },
   dateCard: {
     backgroundColor: colors.darkBackground,
@@ -516,6 +925,19 @@ const styles = StyleSheet.create({
     color: colors.subtleGrey,
     marginTop: spacing.xs,
   },
+  dateStatsContainer: {
+    marginTop: spacing.xs,
+  },
+  dateStatsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: spacing.xs,
+  },
+  dateStatsAmount: {
+    fontSize: fontSize.xs,
+    color: colors.subtleGrey,
+    fontWeight: fontWeight.medium,
+  },
   dateHeaderRight: {
     alignItems: 'flex-end',
     gap: spacing.xs,
@@ -529,6 +951,26 @@ const styles = StyleSheet.create({
   },
   profitNegative: {
     color: '#ef4444',
+  },
+  dateProfitLabel: {
+    fontSize: fontSize.xs,
+    color: colors.subtleGrey,
+    fontWeight: fontWeight.medium,
+  },
+  dateStatusBadges: {
+    flexDirection: 'row',
+    gap: spacing.xs,
+    marginTop: spacing.xs,
+  },
+  statusBadgeSmall: {
+    paddingHorizontal: spacing.xs,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  statusBadgeSmallText: {
+    fontSize: fontSize.xs,
+    fontWeight: fontWeight.bold,
+    color: 'white',
   },
   dateDetails: {
     backgroundColor: colors.inputBackground,
@@ -549,15 +991,51 @@ const styles = StyleSheet.create({
   betItemHeaderLeft: {
     flex: 1,
   },
+  betLotteryContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.xs,
+  },
+  betLotteryLabel: {
+    fontSize: fontSize.xs,
+    color: colors.subtleGrey,
+    fontWeight: fontWeight.medium,
+    marginRight: spacing.xs,
+  },
   betLottery: {
     fontSize: fontSize.sm,
     fontWeight: fontWeight.semibold,
     color: colors.lightText,
   },
+  betThrowContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.xs,
+  },
+  betThrowLabel: {
+    fontSize: fontSize.xs,
+    color: colors.subtleGrey,
+    fontWeight: fontWeight.medium,
+    marginRight: spacing.xs,
+  },
+  betThrow: {
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.semibold,
+    color: colors.lightText,
+  },
+  betDateTimeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  betDateLabel: {
+    fontSize: fontSize.xs,
+    color: colors.subtleGrey,
+    fontWeight: fontWeight.medium,
+    marginRight: spacing.xs,
+  },
   betDate: {
     fontSize: fontSize.xs,
     color: colors.subtleGrey,
-    marginTop: spacing.xs,
   },
   statusBadge: {
     paddingHorizontal: spacing.sm,
@@ -572,30 +1050,163 @@ const styles = StyleSheet.create({
   betPlayItem: {
     marginBottom: spacing.sm,
   },
-  betPlayType: {
-    fontSize: fontSize.xs,
-    fontWeight: fontWeight.bold,
-    color: colors.primaryGold,
-    marginBottom: spacing.xs,
-  },
-  moveItem: {
+  betPlayHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: colors.inputBackground,
-    padding: spacing.xs,
-    borderRadius: borderRadius.sm,
+    alignItems: 'flex-start',
+    marginBottom: spacing.sm,
+    paddingBottom: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.inputBorder,
+  },
+  betPlayTypeContainer: {
+    flex: 1,
+  },
+  betPlayTypeLabel: {
+    fontSize: fontSize.xs,
+    color: colors.subtleGrey,
+    fontWeight: fontWeight.medium,
     marginBottom: spacing.xs,
   },
-  moveNumbers: {
+  betPlayType: {
+    fontSize: fontSize.md,
+    fontWeight: fontWeight.bold,
+    color: colors.primaryGold,
+  },
+  betPlayTotalsContainer: {
+    alignItems: 'flex-end',
+  },
+  betPlayTotalRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.xs,
+  },
+  betPlayTotalLabel: {
     fontSize: fontSize.xs,
+    color: colors.subtleGrey,
+    fontWeight: fontWeight.medium,
+    marginRight: spacing.xs,
+  },
+  betPlayTotal: {
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.bold,
+    color: colors.lightText,
+  },
+  betPlayProfit: {
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.bold,
+  },
+  betDetailsSection: {
+    marginTop: spacing.sm,
+  },
+  betDetailsTitle: {
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.bold,
+    color: colors.primaryGold,
+    marginBottom: spacing.sm,
+  },
+  movesContainer: {
+    marginTop: spacing.sm,
+  },
+  movesTitle: {
+    fontSize: fontSize.xs,
+    fontWeight: fontWeight.bold,
+    color: colors.subtleGrey,
+    marginBottom: spacing.sm,
+    textTransform: 'uppercase',
+  },
+  moveItem: {
+    backgroundColor: colors.inputBackground,
+    padding: spacing.sm,
+    borderRadius: borderRadius.sm,
+    marginBottom: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.inputBorder,
+  },
+  moveNumbersContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.xs,
+  },
+  moveNumbersLabel: {
+    fontSize: fontSize.xs,
+    color: colors.subtleGrey,
+    fontWeight: fontWeight.medium,
+    marginRight: spacing.xs,
+    minWidth: 70,
+  },
+  moveNumbers: {
+    fontSize: fontSize.sm,
     color: colors.lightText,
     fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    fontWeight: fontWeight.bold,
+    flex: 1,
+  },
+  moveAmountContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.xs,
+  },
+  moveAmountLabel: {
+    fontSize: fontSize.xs,
+    color: colors.subtleGrey,
+    fontWeight: fontWeight.medium,
+    marginRight: spacing.xs,
+    minWidth: 70,
   },
   moveAmount: {
-    fontSize: fontSize.xs,
-    fontWeight: fontWeight.semibold,
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.bold,
     color: colors.primaryGold,
+  },
+  moveProfitContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  moveProfitLabel: {
+    fontSize: fontSize.xs,
+    color: colors.subtleGrey,
+    fontWeight: fontWeight.medium,
+    marginRight: spacing.xs,
+    minWidth: 70,
+  },
+  moveProfit: {
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.bold,
+  },
+  betSummary: {
+    flexDirection: 'row',
+    marginTop: spacing.md,
+  },
+  betSummaryLeft: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    padding: spacing.md,
+    backgroundColor: '#ef4444',
+    borderRadius: borderRadius.md,
+    marginRight: spacing.xs,
+  },
+  betSummaryRight: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    padding: spacing.md,
+    backgroundColor: '#22c55e',
+    borderRadius: borderRadius.md,
+    marginLeft: spacing.xs,
+  },
+  betSummaryLabel: {
+    fontSize: fontSize.xs,
+    fontWeight: fontWeight.bold,
+    color: colors.darkBackground,
+  },
+  betSummaryAmount: {
+    fontSize: fontSize.md,
+    fontWeight: fontWeight.heavy,
+    color: colors.darkBackground,
   },
 });
 

@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { jwtDecode } from 'jwt-decode';
 import { authService, userService } from '../api/services';
+import { setLogoutFunction } from '../api/client';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -157,6 +158,38 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Función de logout
+  const logout = async (): Promise<void> => {
+    try {
+      const currentToken = await AsyncStorage.getItem('jwt_token');
+      const isMockUser = currentToken && (
+        currentToken.includes('mock-signature') || 
+        currentToken.includes('mock-user-id')
+      );
+      
+      if (isMockUser) {
+        console.log('AuthContext - Usuario mock detectado, saltando logout del servidor');
+        setUser(null);
+        setError(null);
+        return;
+      }
+      
+      await authService.logout();
+    } catch (error) {
+      console.warn('Error en logout del servidor:', error);
+    } finally {
+      await AsyncStorage.removeItem('jwt_token');
+      await AsyncStorage.removeItem('refresh_token');
+      setUser(null);
+      setError(null);
+    }
+  };
+
+  // Registrar la función de logout en el cliente de axios
+  useEffect(() => {
+    setLogoutFunction(logout);
+  }, []);
+
   // Función para obtener información completa del usuario
   const fetchUserInfo = async (userId: string): Promise<User | null> => {
     try {
@@ -304,33 +337,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       throw new Error(errorMessageToShow);
     } finally {
       setLoading(false);
-    }
-  };
-
-  // Función de logout
-  const logout = async (): Promise<void> => {
-    try {
-      const currentToken = await AsyncStorage.getItem('jwt_token');
-      const isMockUser = currentToken && (
-        currentToken.includes('mock-signature') || 
-        currentToken.includes('mock-user-id')
-      );
-      
-      if (isMockUser) {
-        console.log('AuthContext - Usuario mock detectado, saltando logout del servidor');
-        setUser(null);
-        setError(null);
-        return;
-      }
-      
-      await authService.logout();
-    } catch (error) {
-      console.warn('Error en logout del servidor:', error);
-    } finally {
-      await AsyncStorage.removeItem('jwt_token');
-      await AsyncStorage.removeItem('refresh_token');
-      setUser(null);
-      setError(null);
     }
   };
 

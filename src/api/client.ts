@@ -3,6 +3,14 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import 'react-native-url-polyfill/auto';
 import { utcObjectToLocal, localObjectToUtc } from '../utils/dateUtils';
 
+// Variable para almacenar la función de logout
+let logoutFunction: (() => void) | null = null;
+
+// Función para registrar la función de logout
+export const setLogoutFunction = (logout: () => void) => {
+  logoutFunction = logout;
+};
+
 // Configuración base del cliente
 const baseURL = process.env.EXPO_PUBLIC_API_URL || 'https://api.themoneyvice.com';
 
@@ -114,10 +122,14 @@ axiosInstance.interceptors.response.use(
           return Promise.reject(error);
         }
         
-        // Si falla el refresh, limpiar tokens (en React Native no podemos redirigir automáticamente)
+        // Si falla el refresh, limpiar tokens y desloguear
         await AsyncStorage.removeItem('jwt_token');
         await AsyncStorage.removeItem('refresh_token');
-        // En React Native, manejaremos la redirección en el componente
+        
+        // Llamar a la función de logout para desloguear y redirigir al login
+        if (logoutFunction) {
+          logoutFunction();
+        }
       }
     }
     
