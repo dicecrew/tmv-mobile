@@ -38,6 +38,14 @@ interface BetPlay {
 interface Move {
   totalAmount: number;
   numbers?: string;
+  playTypeName?: string;
+  moveDetails?: MoveDetail[];
+}
+
+interface MoveDetail {
+  number: string;
+  secondNumber?: string;
+  amount: number;
 }
 
 interface State {
@@ -229,7 +237,14 @@ const ValidacionApuestas: React.FC = () => {
     if (!betPlays || !Array.isArray(betPlays)) return 0;
     return betPlays.reduce((sum, betPlay) => {
       if (betPlay.moves && Array.isArray(betPlay.moves)) {
-        return sum + betPlay.moves.reduce((moveSum, move) => moveSum + (move.totalAmount || 0), 0);
+        return sum + betPlay.moves.reduce((moveSum, move) => {
+          // Si hay moveDetails, sumar desde ahí
+          if (move.moveDetails && Array.isArray(move.moveDetails)) {
+            return moveSum + move.moveDetails.reduce((detailSum, detail) => detailSum + (detail.amount || 0), 0);
+          }
+          // Si no, usar totalAmount del move
+          return moveSum + (move.totalAmount || 0);
+        }, 0);
       }
       return sum;
     }, 0);
@@ -255,13 +270,17 @@ const ValidacionApuestas: React.FC = () => {
   const getBetTypeColor = (type: string): string => {
     switch (type) {
       case 'FIJO':
-        return '#2563eb';
-      case 'PARLET':
-        return '#16a34a';
+      case 'Fijo':
+        return '#2563eb'; // Azul
       case 'CORRIDO':
-        return '#7c3aed';
+      case 'Corrido':
+        return '#16a34a'; // Verde
       case 'CENTENA':
-        return '#dc2626';
+      case 'Centena':
+        return '#7c3aed'; // Morado
+      case 'PARLET':
+      case 'Parlet':
+        return '#dc2626'; // Rojo
       default:
         return colors.primaryGold;
     }
@@ -333,7 +352,7 @@ const ValidacionApuestas: React.FC = () => {
                 <ActivityIndicator size="small" color="white" />
               ) : (
                 <>
-                  <Ionicons name="search-outline" size={18} color="white" />
+                  <Ionicons name="search-outline" size={16} color="white" />
                   <Text style={styles.applyButtonText}>Aplicar Filtros</Text>
                 </>
               )}
@@ -366,72 +385,105 @@ const ValidacionApuestas: React.FC = () => {
 
             return (
               <View key={bet.id} style={styles.betCard}>
-                <TouchableOpacity
-                  style={styles.betHeader}
-                  onPress={() => toggleExpandBet(bet.id)}
-                >
-                  <View style={styles.betHeaderLeft}>
-                    <Text style={styles.betUserName}>{bet.userName}</Text>
-                    <Text style={styles.betDetails}>
-                      {bet.lotteryName} - {bet.throwName}
-                    </Text>
-                    <Text style={styles.betDate}>{convertUTCToLocalTime(bet.date)}</Text>
-                  </View>
-                  <View style={styles.betHeaderRight}>
-                    <Text style={styles.betAmount}>${formatAmount(totalAmount)}</Text>
-                    <Ionicons
-                      name={isExpanded ? 'chevron-up' : 'chevron-down'}
-                      size={24}
-                      color={colors.primaryGold}
-                    />
-                  </View>
-                </TouchableOpacity>
-
-                {isExpanded && (
-                  <View style={styles.betDetailsContainer}>
-                    {(bet.betPlays || bet.jugadas || []).map((betPlay, idx) => (
-                      <View key={idx} style={styles.betPlayItem}>
-                        <View
-                          style={[
-                            styles.betTypeBadge,
-                            { backgroundColor: getBetTypeColor(betPlay.playTypeName) },
-                          ]}
-                        >
-                          <Text style={styles.betTypeText}>{betPlay.playTypeName}</Text>
+                <View style={styles.betHeaderContainer}>
+                  <View style={styles.betHeaderContent}>
+                    <TouchableOpacity
+                      style={styles.expandIconButton}
+                      onPress={() => toggleExpandBet(bet.id)}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons
+                        name={isExpanded ? 'chevron-up-circle' : 'chevron-down-circle'}
+                        size={24}
+                        color={colors.primaryGold}
+                      />
+                    </TouchableOpacity>
+                    
+                    <TouchableOpacity
+                      style={styles.betHeader}
+                      onPress={() => toggleExpandBet(bet.id)}
+                      activeOpacity={0.7}
+                    >
+                      <View style={styles.betInfo}>
+                        <View style={styles.betMainInfo}>
+                          <Text style={styles.betUserName}>👤 {bet.userName}</Text>
                         </View>
-                        {betPlay.moves && betPlay.moves.map((move, moveIdx) => (
-                          <View key={moveIdx} style={styles.moveItem}>
-                            <Text style={styles.moveNumbers}>{move.numbers || 'N/A'}</Text>
-                            <Text style={styles.moveAmount}>${formatAmount(move.totalAmount)}</Text>
+                        <View style={styles.betSecondaryInfo}>
+                          <Text style={styles.betDetails}>
+                            🎰 {bet.lotteryName} - {bet.throwName}
+                          </Text>
+                        </View>
+                        <Text style={styles.betDate}>📅 {convertUTCToLocalTime(bet.date)}</Text>
+                      </View>
+                    </TouchableOpacity>
                   </View>
-                ))}
-              </View>
-                    ))}
-
-              <TouchableOpacity
-                      style={styles.validateButton}
+                  
+                  {/* Monto total y botón de validación */}
+                  <View style={styles.actionContainer}>
+                    <Text style={styles.totalAmountLabel}>${formatAmount(totalAmount)}</Text>
+                    <TouchableOpacity
+                      style={styles.quickValidateButton}
                       onPress={() => handleValidateBet(bet)}
                       disabled={isValidating}
                     >
                       <LinearGradient
-                        colors={[colors.primaryGold, colors.primaryRed]}
-                        style={styles.validateButtonGradient}
+                        colors={['#22c55e', '#16a34a']}
+                        style={styles.quickValidateGradient}
                         start={{ x: 0, y: 0 }}
                         end={{ x: 1, y: 1 }}
                       >
                         {isValidating ? (
-                          <ActivityIndicator size="small" color={colors.darkBackground} />
+                          <ActivityIndicator size="small" color="white" />
                         ) : (
-                          <>
-                            <Ionicons name="checkmark-circle-outline" size={20} color={colors.darkBackground} />
-                            <Text style={styles.validateButtonText}>Validar Apuesta</Text>
-                          </>
+                          <Ionicons name="checkmark-circle" size={24} color="white" />
                         )}
                       </LinearGradient>
-              </TouchableOpacity>
-            </View>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                {isExpanded && (
+                  <View style={styles.betDetailsContainer}>
+                    {/* Detalle de jugadas - cada número con su tipo */}
+                    <View style={styles.allNumbersContainer}>
+                      {(bet.betPlays || bet.jugadas || []).map((betPlay, betPlayIdx) => (
+                        <React.Fragment key={betPlayIdx}>
+                          {(betPlay.moves || []).map((move, moveIdx) => (
+                            <React.Fragment key={`${betPlayIdx}-${moveIdx}`}>
+                              {(move.moveDetails || []).map((detail, detailIdx) => {
+                                const playType = move.playTypeName || betPlay.playTypeName || 'JUGADA';
+                                const isParlet = playType.toUpperCase() === 'PARLET';
+                                const numberDisplay = detail.secondNumber 
+                                  ? (isParlet ? `${detail.number}x${detail.secondNumber}` : `${detail.number} - ${detail.secondNumber}`)
+                                  : detail.number;
+                                
+                                return (
+                                  <View key={`${betPlayIdx}-${moveIdx}-${detailIdx}`} style={styles.numberRow}>
+                                    <View style={styles.numberInfo}>
+                                      <View
+                                        style={[
+                                          styles.miniTypeBadge,
+                                          { backgroundColor: getBetTypeColor(playType) },
+                                        ]}
+                                      >
+                                        <Text style={styles.miniTypeText}>{playType}</Text>
+                                      </View>
+                                      <Text style={styles.numberText}>
+                                        🎲 {numberDisplay}
+                                      </Text>
+                                    </View>
+                                    <Text style={styles.numberAmount}>${formatAmount(detail.amount)}</Text>
+                                  </View>
+                                );
+                              })}
+                            </React.Fragment>
+                          ))}
+                        </React.Fragment>
+                      ))}
+                    </View>
+                  </View>
                 )}
-          </View>
+              </View>
             );
           })}
           </ScrollView>
@@ -459,7 +511,14 @@ const getTotalAmount = (betPlays: BetPlay[]): number => {
   if (!betPlays || !Array.isArray(betPlays)) return 0;
   return betPlays.reduce((sum, betPlay) => {
     if (betPlay.moves && Array.isArray(betPlay.moves)) {
-      return sum + betPlay.moves.reduce((moveSum, move) => moveSum + (move.totalAmount || 0), 0);
+      return sum + betPlay.moves.reduce((moveSum, move) => {
+        // Si hay moveDetails, sumar desde ahí
+        if (move.moveDetails && Array.isArray(move.moveDetails)) {
+          return moveSum + move.moveDetails.reduce((detailSum, detail) => detailSum + (detail.amount || 0), 0);
+        }
+        // Si no, usar totalAmount del move
+        return moveSum + (move.totalAmount || 0);
+      }, 0);
     }
     return sum;
   }, 0);
@@ -468,13 +527,17 @@ const getTotalAmount = (betPlays: BetPlay[]): number => {
 const getBetTypeColor = (type: string): string => {
   switch (type) {
     case 'FIJO':
-      return '#2563eb';
-    case 'PARLET':
-      return '#16a34a';
+    case 'Fijo':
+      return '#2563eb'; // Azul
     case 'CORRIDO':
-      return '#7c3aed';
+    case 'Corrido':
+      return '#16a34a'; // Verde
     case 'CENTENA':
-      return '#dc2626';
+    case 'Centena':
+      return '#7c3aed'; // Morado
+    case 'PARLET':
+    case 'Parlet':
+      return '#dc2626'; // Rojo
     default:
       return '#D4AF37';
   }
@@ -535,20 +598,23 @@ const styles = StyleSheet.create({
     color: colors.lightText,
   },
   applyButton: {
-    borderRadius: borderRadius.md,
+    borderRadius: borderRadius.sm,
     overflow: 'hidden',
   },
   applyButtonGradient: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: spacing.sm,
-    paddingVertical: spacing.md,
+    gap: spacing.xs,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.sm,
   },
   applyButtonText: {
-    fontSize: fontSize.md,
+    fontSize: fontSize.sm,
     fontWeight: fontWeight.bold,
     color: 'white',
+    flexShrink: 1,
+    textAlign: 'center',
   },
   loadingContainer: {
     alignItems: 'center',
@@ -575,102 +641,128 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   betCard: {
-    backgroundColor: colors.darkBackground,
+    backgroundColor: colors.inputBackground,
     borderRadius: borderRadius.md,
-    borderWidth: 1,
+    borderWidth: 2,
     borderColor: colors.inputBorder,
-    marginBottom: spacing.md,
+    borderLeftWidth: 4,
+    borderLeftColor: colors.primaryGold,
+    marginBottom: spacing.sm,
     overflow: 'hidden',
   },
-  betHeader: {
+  betHeaderContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    padding: spacing.md,
-    borderLeftWidth: 3,
-    borderLeftColor: colors.primaryGold,
+    justifyContent: 'space-between',
   },
-  betHeaderLeft: {
+  betHeaderContent: {
     flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  expandIconButton: {
+    padding: spacing.xs,
+    paddingLeft: spacing.sm,
+  },
+  betHeader: {
+    flex: 1,
+    paddingVertical: spacing.sm,
+    paddingRight: spacing.sm,
+  },
+  actionContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingRight: spacing.xs,
+  },
+  totalAmountLabel: {
+    fontSize: fontSize.lg,
+    fontWeight: fontWeight.heavy,
+    color: colors.primaryGold,
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+  },
+  quickValidateButton: {
+    borderRadius: borderRadius.md,
+    overflow: 'hidden',
+  },
+  quickValidateGradient: {
+    width: 48,
+    height: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  betInfo: {
+    flex: 1,
+    gap: spacing.xs,
+  },
+  betMainInfo: {
+    marginBottom: 2,
   },
   betUserName: {
     fontSize: fontSize.md,
     fontWeight: fontWeight.bold,
     color: colors.lightText,
   },
+  betSecondaryInfo: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
   betDetails: {
-    fontSize: fontSize.sm,
+    fontSize: fontSize.xs,
     color: colors.subtleGrey,
-    marginTop: spacing.xs,
   },
   betDate: {
     fontSize: fontSize.xs,
     color: colors.subtleGrey,
-    marginTop: spacing.xs,
-  },
-  betHeaderRight: {
-    alignItems: 'flex-end',
-    gap: spacing.xs,
-  },
-  betAmount: {
-    fontSize: fontSize.lg,
-    fontWeight: fontWeight.heavy,
-    color: colors.primaryGold,
   },
   betDetailsContainer: {
-    backgroundColor: colors.inputBackground,
-    padding: spacing.md,
+    backgroundColor: colors.darkBackground,
+    padding: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.inputBorder,
   },
-  betPlayItem: {
-    marginBottom: spacing.md,
+  allNumbersContainer: {
+    gap: spacing.xs,
   },
-  betTypeBadge: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    borderRadius: borderRadius.sm,
-    marginBottom: spacing.sm,
-  },
-  betTypeText: {
-    fontSize: fontSize.xs,
-    fontWeight: fontWeight.bold,
-    color: 'white',
-  },
-  moveItem: {
+  numberRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: colors.darkBackground,
+    backgroundColor: colors.inputBackground,
     padding: spacing.sm,
     borderRadius: borderRadius.sm,
-    marginBottom: spacing.xs,
+    borderWidth: 1,
+    borderColor: colors.inputBorder,
   },
-  moveNumbers: {
-    fontSize: fontSize.sm,
-    color: colors.lightText,
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
-  },
-  moveAmount: {
-    fontSize: fontSize.sm,
-    fontWeight: fontWeight.semibold,
-    color: colors.primaryGold,
-  },
-  validateButton: {
-    borderRadius: borderRadius.md,
-    overflow: 'hidden',
-    marginTop: spacing.md,
-  },
-  validateButtonGradient: {
+  numberInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
     gap: spacing.sm,
-    paddingVertical: spacing.md,
+    flex: 1,
   },
-  validateButtonText: {
+  miniTypeBadge: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 3,
+    borderRadius: borderRadius.sm,
+  },
+  miniTypeText: {
+    fontSize: fontSize.xs,
+    fontWeight: fontWeight.bold,
+    color: 'white',
+    textTransform: 'uppercase',
+  },
+  numberText: {
+    fontSize: fontSize.sm,
+    color: colors.lightText,
+    fontWeight: fontWeight.semibold,
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+  },
+  numberAmount: {
     fontSize: fontSize.md,
     fontWeight: fontWeight.bold,
-    color: colors.darkBackground,
+    color: colors.primaryGold,
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
   },
 });
 

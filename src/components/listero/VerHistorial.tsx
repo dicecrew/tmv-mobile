@@ -25,6 +25,20 @@ interface Player {
   phoneNumber: string;
 }
 
+interface ThrowResult {
+  id: string;
+  throwId: string;
+  throwName: string;
+  date: string;
+  centena: string;
+  corrido1: string;
+  corrido2: string;
+  totalProfit: number;
+  totalRevenue: number;
+  createdAt: string;
+  updatedAt: string | null;
+}
+
 interface BetResume {
   id: string;
   date: string;
@@ -34,6 +48,9 @@ interface BetResume {
   revenue: number;
   bets: Bet[];
   summary?: Summary;
+  inicialPool?: number;
+  endPool?: number;
+  throwResult?: ThrowResult | null;
 }
 
 interface Bet {
@@ -54,6 +71,15 @@ interface Move {
   totalAmount: number;
   profit: number;
   numbers?: string;
+  playTypeName?: string;
+  moveDetails?: MoveDetail[];
+}
+
+interface MoveDetail {
+  number: string;
+  secondNumber?: string;
+  amount: number;
+  profit?: number;
 }
 
 interface Summary {
@@ -81,6 +107,7 @@ const VerHistorial: React.FC = () => {
   const [players, setPlayers] = useState<Player[]>([]);
   const [betResumes, setBetResumes] = useState<BetResume[]>([]);
   const [summary, setSummary] = useState<Summary | null>(null);
+  const [expandedBetResumes, setExpandedBetResumes] = useState<Set<string>>(new Set());
   const [expandedBets, setExpandedBets] = useState<Set<string>>(new Set());
 
   const [isLoadingBookie, setIsLoadingBookie] = useState(false);
@@ -215,14 +242,27 @@ const VerHistorial: React.FC = () => {
     setDateTo(dateTo);
   };
 
-  // Alternar expansión
-  const toggleExpandBet = (betResumeId: string) => {
-    setExpandedBets((prev) => {
+  // Alternar expansión del BetResume
+  const toggleExpandBetResume = (betResumeId: string) => {
+    setExpandedBetResumes((prev) => {
       const newSet = new Set(prev);
       if (newSet.has(betResumeId)) {
         newSet.delete(betResumeId);
       } else {
         newSet.add(betResumeId);
+      }
+      return newSet;
+    });
+  };
+
+  // Alternar expansión de una apuesta individual
+  const toggleExpandBet = (betId: string) => {
+    setExpandedBets((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(betId)) {
+        newSet.delete(betId);
+      } else {
+        newSet.add(betId);
       }
       return newSet;
     });
@@ -236,6 +276,7 @@ const VerHistorial: React.FC = () => {
     setShowHistory(false);
     setBetResumes([]);
     setSummary(null);
+    setExpandedBetResumes(new Set());
     setExpandedBets(new Set());
   };
 
@@ -249,9 +290,37 @@ const VerHistorial: React.FC = () => {
   const convertUTCToLocalTime = (utcDateString: string): string => {
     try {
       const date = new Date(utcDateString);
-      return date.toLocaleDateString() + ', ' + date.toLocaleTimeString();
+      const day = String(date.getDate()).padStart(2, '0');
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const year = date.getFullYear();
+      const time = date.toLocaleTimeString('es-ES', { 
+        hour: '2-digit', 
+        minute: '2-digit',
+        hour12: true 
+      });
+      return `${day}/${month}/${year}, ${time}`;
     } catch (error) {
       return 'Fecha inválida';
+    }
+  };
+
+  // Color por tipo de apuesta
+  const getBetTypeColor = (type: string): string => {
+    switch (type) {
+      case 'FIJO':
+      case 'Fijo':
+        return '#2563eb'; // Azul
+      case 'CORRIDO':
+      case 'Corrido':
+        return '#16a34a'; // Verde
+      case 'CENTENA':
+      case 'Centena':
+        return '#7c3aed'; // Morado
+      case 'PARLET':
+      case 'Parlet':
+        return '#dc2626'; // Rojo
+      default:
+        return colors.primaryGold;
     }
   };
 
@@ -330,6 +399,56 @@ const VerHistorial: React.FC = () => {
       totalProfit,
       totalBets,
       netProfit: totalProfit - totalAmount,
+    };
+  };
+
+  // Resumen detallado por lotería
+  const getDetailedBetResumeSummary = (betResume: BetResume) => {
+    let totalAmount = 0;
+    let totalPrize = 0;
+    let totalBets = betResume.bets?.length || 0;
+    const uniquePlayers = new Set<string>();
+
+    betResume.bets?.forEach((bet) => {
+      uniquePlayers.add(bet.userId);
+      bet.betPlays?.forEach((betPlay) => {
+        betPlay.moves?.forEach((move) => {
+          totalAmount += move.totalAmount || 0;
+          if (move.profit && move.profit > 0) {
+            totalPrize += move.profit;
+          }
+        });
+      });
+    });
+
+    const netProfit = totalPrize - totalAmount;
+    const ownProfit = -netProfit; // Ganancia propia es lo inverso
+    const profitBenefit = 0; // Por ahora en 0, se puede calcular según porcentaje
+    
+    const initialPool = betResume.inicialPool || 0;
+    const finalPool = betResume.endPool || 0;
+    
+    // Verificar si hay números ganadores desde throwResult
+    const hasWinningNumbers = !!(
+      betResume.throwResult?.centena || 
+      betResume.throwResult?.corrido1 || 
+      betResume.throwResult?.corrido2
+    );
+
+    return {
+      totalBets,
+      totalAmount,
+      uniquePlayers: uniquePlayers.size,
+      totalPrize,
+      netProfit,
+      ownProfit,
+      profitBenefit,
+      initialPool,
+      finalPool,
+      hasWinningNumbers,
+      centena: betResume.throwResult?.centena || null,
+      corrido1: betResume.throwResult?.corrido1 || null,
+      corrido2: betResume.throwResult?.corrido2 || null,
     };
   };
 
@@ -469,80 +588,237 @@ const VerHistorial: React.FC = () => {
 
             <ScrollView style={styles.betResumesList}>
               {sortedBetResumes.map((betResume) => {
-                const isExpanded = expandedBets.has(betResume.id);
+                const isResumeExpanded = expandedBetResumes.has(betResume.id);
                 const resumeSummary = getBetResumeSummary(betResume);
+                const detailedSummary = getDetailedBetResumeSummary(betResume);
 
                 return (
                   <View key={betResume.id} style={styles.betResumeCard}>
+                    {/* Barra de estado superior */}
+                    {detailedSummary.hasWinningNumbers ? (
+                      <View style={styles.statusBarWinning}>
+                        <View style={styles.statusBarLeft}>
+                          <Ionicons name="trophy" size={20} color={colors.primaryGold} />
+                          <Text style={styles.statusBarLabel}>Ganadores</Text>
+                        </View>
+                        <View style={styles.winningNumbersRow}>
+                          {detailedSummary.centena && (
+                            <View style={styles.winningChip}>
+                              <Text style={styles.winningChipText}>{detailedSummary.centena}</Text>
+                            </View>
+                          )}
+                          {detailedSummary.corrido1 && (
+                            <View style={styles.winningChip}>
+                              <Text style={styles.winningChipText}>{detailedSummary.corrido1}</Text>
+                            </View>
+                          )}
+                          {detailedSummary.corrido2 && (
+                            <View style={styles.winningChip}>
+                              <Text style={styles.winningChipText}>{detailedSummary.corrido2}</Text>
+                            </View>
+                          )}
+                        </View>
+                      </View>
+                    ) : (
+                      <View style={styles.statusBarNoResults}>
+                        <Ionicons name="time-outline" size={20} color={colors.primaryRed} />
+                        <Text style={styles.statusBarNoResultsText}>Sin Resultados</Text>
+                      </View>
+                    )}
+
                     <TouchableOpacity
                       style={styles.betResumeHeader}
-                      onPress={() => toggleExpandBet(betResume.id)}
+                      onPress={() => toggleExpandBetResume(betResume.id)}
                     >
-                      <View style={styles.betResumeHeaderLeft}>
-                        <Text style={styles.betResumeLottery}>
-                          {betResume.lotteryName} - {betResume.throwName}
-                        </Text>
-                        <Text style={styles.betResumeDate}>
-                          {convertUTCToLocalTime(betResume.date)}
-                        </Text>
-                        <Text style={styles.betResumeStats}>
-                          {resumeSummary.totalBets} apuesta{resumeSummary.totalBets !== 1 ? 's' : ''}
-                          {' · '}${formatAmount(resumeSummary.totalAmount)}
-                        </Text>
+                      <View style={styles.betResumeHeaderContent}>
+                        {/* Primera fila: Lotería */}
+                        <View style={styles.headerRow}>
+                          <View style={styles.lotterySection}>
+                            <Ionicons name="game-controller-outline" size={14} color={colors.primaryGold} />
+                            <Text style={styles.betResumeLottery}>
+                              {betResume.lotteryName} - {betResume.throwName}
+                            </Text>
+                          </View>
+                        </View>
+
+                        {/* Segunda fila: Fecha + Apuestas */}
+                        <View style={styles.headerRow}>
+                          <Text style={styles.dateText}>📅 {convertUTCToLocalTime(betResume.date)}</Text>
+                          <Text style={styles.betCountText}>
+                            📄 {resumeSummary.totalBets} apuesta{resumeSummary.totalBets !== 1 ? 's' : ''}
+                          </Text>
+                        </View>
+
+                        {/* Tercera fila: Fondos a la izquierda, Total a la derecha */}
+                        <View style={styles.headerRow}>
+                          <View style={styles.poolsRow}>
+                            <Text style={styles.poolText}>💰 Inicial: ${formatAmount(detailedSummary.initialPool)}</Text>
+                            <Text style={styles.poolSeparator}>•</Text>
+                            <Text style={styles.poolText}>💎 Final: ${formatAmount(detailedSummary.finalPool)}</Text>
+                          </View>
+                          <LinearGradient
+                            colors={[colors.primaryGold, colors.primaryRed]}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 1 }}
+                            style={styles.totalBadgeCompact}
+                          >
+                            <Text style={styles.totalBadgeText}>${formatAmount(resumeSummary.totalAmount)}</Text>
+                          </LinearGradient>
+                        </View>
                       </View>
-                      <View style={styles.betResumeHeaderRight}>
-                        <Text
-                          style={[
-                            styles.betResumeProfit,
-                            resumeSummary.netProfit >= 0 ? styles.profitPositive : styles.profitNegative,
-                          ]}
-                        >
-                          ${formatAmount(resumeSummary.netProfit)}
-                        </Text>
-                        <Ionicons
-                          name={isExpanded ? 'chevron-up' : 'chevron-down'}
-                          size={24}
-                          color={colors.primaryGold}
-                        />
-                      </View>
+                      <Ionicons
+                        name={isResumeExpanded ? 'chevron-up-circle' : 'chevron-down-circle'}
+                        size={24}
+                        color={colors.primaryGold}
+                      />
                     </TouchableOpacity>
 
-                    {isExpanded && (
+                    {isResumeExpanded && (
                       <View style={styles.betResumeDetails}>
-                        {betResume.bets.map((bet) => (
-                          <View key={bet.id} style={styles.betItem}>
-                            <View style={styles.betItemHeader}>
-                              <View style={styles.betItemHeaderLeft}>
-                                <Text style={styles.betUserName}>{bet.userName}</Text>
-                                <Text style={styles.betDate}>{convertUTCToLocalTime(bet.date)}</Text>
-                              </View>
-                              <View
+                        {/* Resumen detallado por lotería */}
+                        <View style={styles.lotteryDetailedSummary}>
+                          <View style={styles.summaryRowMain}>
+                            <View style={styles.summaryMainItem}>
+                              <Text style={styles.summaryMainValue}>{detailedSummary.totalBets}</Text>
+                              <Text style={styles.summaryMainLabel}>APUESTAS</Text>
+                            </View>
+                            <View style={styles.summaryMainItem}>
+                              <Text style={styles.summaryMainValueGold}>${formatAmount(detailedSummary.totalAmount)}</Text>
+                              <Text style={styles.summaryMainLabel}>MONTO TOTAL</Text>
+                            </View>
+                            <View style={styles.summaryMainItem}>
+                              <Text style={styles.summaryMainValue}>{detailedSummary.uniquePlayers}</Text>
+                              <Text style={styles.summaryMainLabel}>JUGADOR{detailedSummary.uniquePlayers !== 1 ? 'ES' : ''}</Text>
+                            </View>
+                          </View>
+                          
+                          <View style={styles.summaryDetailedGrid}>
+                            <View style={styles.summaryDetailedItem}>
+                              <Text style={styles.summaryDetailedLabel}>PREMIO TOTAL</Text>
+                              <Text style={[styles.summaryDetailedValue, styles.prizeValue]}>
+                                ${formatAmount(detailedSummary.totalPrize)}
+                              </Text>
+                            </View>
+                            <View style={styles.summaryDetailedItem}>
+                              <Text style={styles.summaryDetailedLabel}>GANANCIA NETA</Text>
+                              <Text
                                 style={[
-                                  styles.statusBadge,
-                                  { backgroundColor: getStatusColor(bet.stateCode) },
+                                  styles.summaryDetailedValue,
+                                  detailedSummary.netProfit >= 0 ? styles.profitPositive : styles.profitNegative,
                                 ]}
                               >
-                                <Text style={styles.statusText}>
-                                  {getStatusIcon(bet.stateCode)} {bet.stateCode}
-                                </Text>
-                              </View>
+                                ${formatAmount(detailedSummary.netProfit)}
+                              </Text>
                             </View>
+                            <View style={styles.summaryDetailedItem}>
+                              <Text style={styles.summaryDetailedLabel}>GANANCIA PROPIA</Text>
+                              <Text
+                                style={[
+                                  styles.summaryDetailedValue,
+                                  detailedSummary.ownProfit >= 0 ? styles.profitPositive : styles.profitNegative,
+                                ]}
+                              >
+                                ${formatAmount(detailedSummary.ownProfit)}
+                              </Text>
+                            </View>
+                            <View style={styles.summaryDetailedItem}>
+                              <Text style={styles.summaryDetailedLabel}>BENEFICIO POR GANANCIA</Text>
+                              <Text style={[styles.summaryDetailedValue, styles.benefitValue]}>
+                                ${formatAmount(detailedSummary.profitBenefit)}
+                              </Text>
+                            </View>
+                          </View>
+                        </View>
 
-                            {bet.betPlays?.map((betPlay, idx) => (
-                              <View key={idx} style={styles.betPlayItem}>
-                                <Text style={styles.betPlayType}>{betPlay.playTypeName}</Text>
-                                {betPlay.moves?.map((move, moveIdx) => (
-                                  <View key={moveIdx} style={styles.moveItem}>
-                                    <Text style={styles.moveNumbers}>{move.numbers || 'N/A'}</Text>
-                                    <Text style={styles.moveAmount}>
-                                      ${formatAmount(move.totalAmount)}
+                        {betResume.bets.map((bet, betIndex) => {
+                          const isBetExpanded = expandedBets.has(bet.id);
+
+                          return (
+                            <View key={bet.id} style={styles.betItem}>
+                              <TouchableOpacity
+                                style={styles.betItemHeader}
+                                onPress={() => toggleExpandBet(bet.id)}
+                                activeOpacity={0.7}
+                              >
+                                <View style={styles.betItemHeaderLeft}>
+                                  <Ionicons
+                                    name={isBetExpanded ? 'chevron-up-circle' : 'chevron-down-circle'}
+                                    size={20}
+                                    color={colors.primaryGold}
+                                  />
+                                  <View style={styles.betUserInfo}>
+                                    <Text style={styles.betUserName}>👤 {bet.userName}</Text>
+                                    <Text style={styles.betDate}>📅 {convertUTCToLocalTime(bet.date)}</Text>
+                                  </View>
+                                </View>
+                                <View style={styles.betItemHeaderRight}>
+                                  <View
+                                    style={[
+                                      styles.statusBadge,
+                                      { backgroundColor: getStatusColor(bet.stateCode) },
+                                    ]}
+                                  >
+                                    <Text style={styles.statusText}>
+                                      {getStatusIcon(bet.stateCode)} {bet.stateCode}
                                     </Text>
                                   </View>
+                                </View>
+                              </TouchableOpacity>
+
+                              {/* Detalle de jugadas - cada número con su tipo (solo si está expandido) */}
+                              {isBetExpanded && (
+                                <View style={styles.allNumbersContainer}>
+                                {bet.betPlays?.map((betPlay, betPlayIdx) => (
+                                  <React.Fragment key={betPlayIdx}>
+                                    {(betPlay.moves || []).map((move, moveIdx) => (
+                                      <React.Fragment key={`${betPlayIdx}-${moveIdx}`}>
+                                        {(move.moveDetails || []).map((detail, detailIdx) => {
+                                          const playType = move.playTypeName || betPlay.playTypeName || 'JUGADA';
+                                          const isParlet = playType.toUpperCase() === 'PARLET';
+                                          const numberDisplay = detail.secondNumber 
+                                            ? (isParlet ? `${detail.number}x${detail.secondNumber}` : `${detail.number} - ${detail.secondNumber}`)
+                                            : detail.number;
+                                          
+                                          return (
+                                            <View key={`${betPlayIdx}-${moveIdx}-${detailIdx}`} style={styles.numberRow}>
+                                              <View style={styles.numberInfo}>
+                                                <View
+                                                  style={[
+                                                    styles.miniTypeBadge,
+                                                    { backgroundColor: getBetTypeColor(playType) },
+                                                  ]}
+                                                >
+                                                  <Text style={styles.miniTypeText}>{playType}</Text>
+                                                </View>
+                                                <Text style={styles.numberText}>
+                                                  🎲 {numberDisplay}
+                                                </Text>
+                                              </View>
+                                              <View style={styles.amountInfo}>
+                                                <Text style={styles.numberAmount}>${formatAmount(detail.amount)}</Text>
+                                                {detail.profit !== undefined && detail.profit !== 0 && (
+                                                  <Text
+                                                    style={[
+                                                      styles.numberProfit,
+                                                      detail.profit > 0 ? styles.profitPositive : styles.profitNegative,
+                                                    ]}
+                                                  >
+                                                    {detail.profit > 0 ? '+' : ''}{formatAmount(detail.profit)}
+                                                  </Text>
+                                                )}
+                                              </View>
+                                            </View>
+                                          );
+                                        })}
+                                      </React.Fragment>
+                                    ))}
+                                  </React.Fragment>
                                 ))}
-                              </View>
-                            ))}
-                          </View>
-                        ))}
+                                </View>
+                              )}
+                            </View>
+                          );
+                        })}
                       </View>
                     )}
             </View>
@@ -702,44 +978,142 @@ const styles = StyleSheet.create({
   betResumeCard: {
     backgroundColor: colors.darkBackground,
     borderRadius: borderRadius.md,
-    borderWidth: 1,
-    borderColor: colors.inputBorder,
+    borderWidth: 2,
+    borderColor: colors.primaryGold,
     marginBottom: spacing.md,
     overflow: 'hidden',
+    shadowColor: colors.primaryGold,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 5,
+    elevation: 5,
   },
-  betResumeHeader: {
+  statusBarWinning: {
+    backgroundColor: '#1a1a1a',
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: spacing.md,
-    borderLeftWidth: 3,
-    borderLeftColor: colors.primaryGold,
+    borderBottomWidth: 3,
+    borderBottomColor: colors.primaryGold,
   },
-  betResumeHeaderLeft: {
+  statusBarLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  statusBarLabel: {
+    fontSize: fontSize.md,
+    fontWeight: fontWeight.bold,
+    color: colors.primaryGold,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+  },
+  winningNumbersRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  winningChip: {
+    backgroundColor: colors.primaryGold,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.sm,
+    minWidth: 36,
+    alignItems: 'center',
+    shadowColor: colors.primaryGold,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.4,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  winningChipText: {
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.heavy,
+    color: '#1a1a1a',
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+  },
+  statusBarNoResults: {
+    backgroundColor: '#1a1a1a',
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: spacing.sm,
+    borderBottomWidth: 3,
+    borderBottomColor: colors.primaryRed,
+  },
+  statusBarNoResultsText: {
+    fontSize: fontSize.md,
+    fontWeight: fontWeight.bold,
+    color: colors.primaryRed,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+  },
+  betResumeHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    gap: spacing.xs,
+  },
+  betResumeHeaderContent: {
     flex: 1,
+    gap: 2,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  lotterySection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
   },
   betResumeLottery: {
-    fontSize: fontSize.md,
+    fontSize: fontSize.sm,
     fontWeight: fontWeight.bold,
     color: colors.lightText,
   },
-  betResumeDate: {
+  dateText: {
     fontSize: fontSize.xs,
     color: colors.subtleGrey,
-    marginTop: spacing.xs,
   },
-  betResumeStats: {
-    fontSize: fontSize.sm,
+  betCountText: {
+    fontSize: fontSize.xs,
     color: colors.subtleGrey,
-    marginTop: spacing.xs,
   },
-  betResumeHeaderRight: {
-    alignItems: 'flex-end',
+  poolsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: spacing.xs,
   },
-  betResumeProfit: {
-    fontSize: fontSize.lg,
+  poolText: {
+    fontSize: fontSize.xs,
+    fontWeight: fontWeight.semibold,
+    color: '#8b5cf6',
+  },
+  poolSeparator: {
+    fontSize: fontSize.xs,
+    color: colors.subtleGrey,
+  },
+  totalBadgeCompact: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.md,
+    shadowColor: colors.primaryGold,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.4,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  totalBadgeText: {
+    fontSize: fontSize.md,
     fontWeight: fontWeight.heavy,
+    color: '#1a1a1a',
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
   },
   profitPositive: {
     color: '#22c55e',
@@ -751,30 +1125,114 @@ const styles = StyleSheet.create({
     backgroundColor: colors.inputBackground,
     padding: spacing.md,
   },
-  betItem: {
+  lotteryDetailedSummary: {
     backgroundColor: colors.darkBackground,
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+    borderWidth: 2,
+    borderColor: colors.primaryGold,
+  },
+  summaryRowMain: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginBottom: spacing.md,
+    paddingBottom: spacing.md,
+    borderBottomWidth: 2,
+    borderBottomColor: colors.primaryGold,
+  },
+  summaryMainItem: {
+    alignItems: 'center',
+  },
+  summaryMainValue: {
+    fontSize: fontSize.xxl,
+    fontWeight: fontWeight.heavy,
+    color: colors.lightText,
+    marginBottom: spacing.xs,
+  },
+  summaryMainValueGold: {
+    fontSize: fontSize.xxl,
+    fontWeight: fontWeight.heavy,
+    color: colors.primaryGold,
+    marginBottom: spacing.xs,
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+  },
+  summaryMainLabel: {
+    fontSize: fontSize.xs,
+    fontWeight: fontWeight.bold,
+    color: colors.subtleGrey,
+    textTransform: 'uppercase',
+  },
+  summaryDetailedGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+  },
+  summaryDetailedItem: {
+    flex: 1,
+    minWidth: '45%',
+    backgroundColor: colors.inputBackground,
     padding: spacing.sm,
     borderRadius: borderRadius.sm,
-    marginBottom: spacing.sm,
+    alignItems: 'center',
+  },
+  summaryDetailedLabel: {
+    fontSize: fontSize.xs,
+    fontWeight: fontWeight.semibold,
+    color: colors.subtleGrey,
+    marginBottom: spacing.xs,
+    textAlign: 'center',
+  },
+  summaryDetailedValue: {
+    fontSize: fontSize.lg,
+    fontWeight: fontWeight.bold,
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+  },
+  prizeValue: {
+    color: '#3b82f6', // Azul para premios
+  },
+  benefitValue: {
+    color: colors.primaryGold,
+  },
+  poolValue: {
+    color: '#8b5cf6', // Púrpura para fondos
+  },
+  betItem: {
+    backgroundColor: colors.darkBackground,
+    padding: spacing.md,
+    borderRadius: borderRadius.md,
+    marginBottom: spacing.md,
+    borderWidth: 2,
+    borderColor: colors.inputBorder,
+    borderLeftWidth: 4,
+    borderLeftColor: colors.primaryGold,
   },
   betItemHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: spacing.sm,
   },
   betItemHeaderLeft: {
     flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  betItemHeaderRight: {
+    alignItems: 'flex-end',
+  },
+  betUserInfo: {
+    flex: 1,
   },
   betUserName: {
-    fontSize: fontSize.sm,
-    fontWeight: fontWeight.semibold,
+    fontSize: fontSize.md,
+    fontWeight: fontWeight.bold,
     color: colors.lightText,
   },
   betDate: {
     fontSize: fontSize.xs,
     color: colors.subtleGrey,
-    marginTop: spacing.xs,
+    marginTop: 2,
   },
   statusBadge: {
     paddingHorizontal: spacing.sm,
@@ -786,33 +1244,56 @@ const styles = StyleSheet.create({
     fontWeight: fontWeight.bold,
     color: 'white',
   },
-  betPlayItem: {
-    marginBottom: spacing.sm,
+  allNumbersContainer: {
+    gap: spacing.xs,
+    marginTop: spacing.sm,
   },
-  betPlayType: {
-    fontSize: fontSize.xs,
-    fontWeight: fontWeight.bold,
-    color: colors.primaryGold,
-    marginBottom: spacing.xs,
-  },
-  moveItem: {
+  numberRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     backgroundColor: colors.inputBackground,
-    padding: spacing.xs,
+    padding: spacing.sm,
     borderRadius: borderRadius.sm,
-    marginBottom: spacing.xs,
+    borderWidth: 1,
+    borderColor: colors.inputBorder,
   },
-  moveNumbers: {
+  numberInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    flex: 1,
+  },
+  miniTypeBadge: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 3,
+    borderRadius: borderRadius.sm,
+  },
+  miniTypeText: {
     fontSize: fontSize.xs,
+    fontWeight: fontWeight.bold,
+    color: 'white',
+    textTransform: 'uppercase',
+  },
+  numberText: {
+    fontSize: fontSize.sm,
     color: colors.lightText,
+    fontWeight: fontWeight.semibold,
     fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
   },
-  moveAmount: {
+  amountInfo: {
+    alignItems: 'flex-end',
+    gap: 2,
+  },
+  numberAmount: {
+    fontSize: fontSize.md,
+    fontWeight: fontWeight.bold,
+    color: colors.primaryGold,
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+  },
+  numberProfit: {
     fontSize: fontSize.xs,
     fontWeight: fontWeight.semibold,
-    color: colors.primaryGold,
   },
 });
 
