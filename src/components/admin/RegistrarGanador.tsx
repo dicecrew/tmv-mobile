@@ -95,15 +95,14 @@ const RegistrarGanador: React.FC = () => {
     try {
       const response = await adminService.getRegisterWinningNumbersStatus(operationId);
       const progress = response.data;
-      
-      console.log('📊 Progress update:', progress);
       setProgressData(progress);
 
-      // Verificar si terminó
-      const isCompleted = progress.percent === 100 && progress.stepIndex === 5 && progress.state === 2;
+      // Verificar si el proceso terminó (state === 2 significa completado)
+      const isCompleted = progress.percent === 100 && 
+                         progress.stepIndex === 5 && 
+                         progress.state === 2;
       
       if (progress.state === 'Succeeded' || progress.state === 'Failed' || isCompleted) {
-        console.log('🏁 Operación terminada:', progress.state);
         setIsProcessing(false);
         
         if (pollingIntervalRef.current) {
@@ -111,15 +110,17 @@ const RegistrarGanador: React.FC = () => {
           pollingIntervalRef.current = null;
         }
 
+        // Cerrar modal y mostrar resultado
         setTimeout(() => {
           setShowProgressModal(false);
           resetForm();
+          loadInactiveThrows();
           
           if (progress.state === 'Succeeded' || isCompleted) {
             Toast.show({
               type: 'success',
-              text1: '¡Éxito!',
-              text2: 'Números ganadores registrados y cuadratura completada',
+              text1: '✅ Completado',
+              text2: 'Números ganadores registrados correctamente',
               position: 'top',
               topOffset: 60,
               visibilityTime: 6000,
@@ -127,27 +128,32 @@ const RegistrarGanador: React.FC = () => {
           } else if (progress.state === 'Failed') {
             Toast.show({
               type: 'error',
-              text1: 'Error',
-              text2: 'Error al registrar números ganadores',
+              text1: '❌ Error',
+              text2: 'Error al procesar los números ganadores',
               position: 'top',
               topOffset: 60,
               visibilityTime: 6000,
             });
           }
-        }, 2000);
+        }, 3000);
       }
-    } catch (error) {
-      console.error('Error checking status:', error);
+    } catch (error: any) {
+      // Si es 404, el operationId aún no existe en el servidor, continuar esperando silenciosamente
+      if (error?.response?.status === 404) {
+        // No loggear nada, es normal en los primeros intentos
+        // El interceptor de axios ya muestra "⏳ Esperando..."
+      } else {
+        // Solo loggear errores que NO sean 404
+        console.error('❌ Error consultando status:', error?.response?.status, error?.message);
+      }
     }
   };
 
-  // Iniciar polling cuando hay operationId
+  // Polling manual cada 2 segundos (igual que versión web)
   useEffect(() => {
     if (operationId && isProcessing) {
-      console.log('🔄 Iniciando polling para:', operationId);
-      
-      // Primer check inmediato
-      setTimeout(() => checkOperationStatus(), 1000);
+      // Hacer el primer refetch inmediatamente (igual que web)
+      checkOperationStatus();
       
       // Polling cada 2 segundos
       pollingIntervalRef.current = setInterval(() => {
@@ -216,48 +222,56 @@ const RegistrarGanador: React.FC = () => {
           text: 'Enviar',
           style: 'destructive',
           onPress: async () => {
+            // 🔥 Enviar números como STRING con padding para preservar ceros a la izquierda
+            const centenaFormatted = winningNumber1 ? winningNumber1.trim().padStart(3, '0') : '000';
+            const corrido1Formatted = winningNumber2 ? winningNumber2.trim().padStart(2, '0') : '00';
+            const corrido2Formatted = winningNumber3 ? winningNumber3.trim().padStart(2, '0') : '00';
+            
             const requestData = {
               throwId: selectedThrowId,
               date: new Date().toISOString(),
-              centena: parseInt(winningNumber1) || 0,
-              corrido1: parseInt(winningNumber2) || 0,
-              corrido2: parseInt(winningNumber3) || 0,
+              centena: centenaFormatted,   // String: "000", "010", "090"
+              corrido1: corrido1Formatted,  // String: "05", "06", "99"
+              corrido2: corrido2Formatted   // String: "05", "06", "99"
             };
-
-            console.log('Registrando Números Ganadores:', requestData);
 
             try {
               setIsProcessing(true);
               const response = await adminService.registerWinningNumbers(requestData);
 
-              console.log('Response:', response);
-
               if (response?.data?.operationId) {
-                const receivedOperationId = String(response.data.operationId).trim();
+                let receivedOperationId = String(response.data.operationId).trim();
                 
-                if (!receivedOperationId || receivedOperationId.length === 0) {
+                // Validación estricta del operationId (igual que versión web)
+                if (!receivedOperationId || 
+                    receivedOperationId.length === 0 || 
+                    receivedOperationId === 'undefined' || 
+                    receivedOperationId === 'null') {
+                  console.error('❌ OperationId inválido recibido:', receivedOperationId);
                   throw new Error('OperationId inválido recibido del servidor');
                 }
-
-                console.log('✅ Operation ID recibido:', receivedOperationId);
-                setOperationId(receivedOperationId);
                 
-                setTimeout(() => {
-                  setShowProgressModal(true);
-                }, 1000);
+                // 🔥 IMPORTANTE: Usar el operationId TAL CUAL viene del servidor (sin guiones)
+                // El backend espera el formato de 32 caracteres sin guiones
+                setOperationId(receivedOperationId);
+                setShowProgressModal(true); // Mostrar modal inmediatamente (igual que web)
               } else {
+                console.error('❌ No se recibió operationId en la respuesta:', response);
                 throw new Error('No se recibió operationId del servidor');
               }
             } catch (error: any) {
-              console.error('Error al registrar números ganadores:', error);
+              console.error('❌ Error al registrar números ganadores:', error);
+              console.error('❌ Error response:', error?.response);
+              console.error('❌ Error data:', error?.response?.data);
               setIsProcessing(false);
 
               Toast.show({
                 type: 'error',
-                text1: 'Error',
-                text2: error.message || 'Error al iniciar el proceso de registro',
+                text1: '❌ Error',
+                text2: error?.response?.data?.message || error.message || 'Error al iniciar el proceso de registro',
                 position: 'top',
                 topOffset: 60,
+                visibilityTime: 5000,
               });
             }
           },
@@ -358,8 +372,8 @@ const RegistrarGanador: React.FC = () => {
                   </>
                 ) : (
                   <>
-                    <Ionicons name="trophy-outline" size={20} color={colors.darkBackground} />
-                    <Text style={styles.submitButtonText}>Publicar Números Ganadores</Text>
+                    <Ionicons name="trophy-outline" size={18} color={colors.darkBackground} />
+                    <Text style={styles.submitButtonText}>Publicar Ganadores</Text>
                   </>
                 )}
               </LinearGradient>
@@ -570,13 +584,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: spacing.sm,
+    gap: spacing.xs,
     paddingVertical: spacing.lg,
+    paddingHorizontal: spacing.sm,
   },
   submitButtonText: {
-    fontSize: fontSize.lg,
+    fontSize: fontSize.md,
     fontWeight: fontWeight.bold,
     color: colors.darkBackground,
+    flexShrink: 1,
+    textAlign: 'center',
   },
   warningBox: {
     flexDirection: 'row',

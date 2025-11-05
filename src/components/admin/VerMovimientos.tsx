@@ -145,15 +145,7 @@ const VerMovimientos: React.FC = () => {
         params.bookieId = selectedBookie;
       }
 
-      console.log('📊 Aplicando filtros Ver Movimientos:', params);
-
       const response = await adminService.getBetResumeSummary(params);
-      
-      console.log('📦 Respuesta completa:', response);
-      console.log('📦 Respuesta data:', response.data);
-      console.log('📦 Tipo de response:', typeof response);
-      console.log('📦 Es array response?:', Array.isArray(response));
-      console.log('📦 Es array response.data?:', Array.isArray(response.data));
 
       // Manejar la respuesta correctamente
       let dataToSet: DateData[] = [];
@@ -170,9 +162,6 @@ const VerMovimientos: React.FC = () => {
         // Si response es directamente un array
         dataToSet = response;
       }
-
-      console.log('📊 Datos procesados:', dataToSet);
-      console.log('📊 Cantidad de registros:', dataToSet.length);
 
       setBetResumeData(dataToSet);
       setShowHistory(true);

@@ -98,18 +98,27 @@ axiosInstance.interceptors.response.use(
     return response;
   },
   async (error: AxiosError) => {
-    // 🌐 NETWORK LOGGING - ERROR
-    console.log('\n🔴 ===== NETWORK ERROR =====');
-    console.log(`📡 ${error.config?.method?.toUpperCase()} ${error.config?.url}`);
-    console.log(`❌ Error: ${error.message}`);
-    if (error.response) {
-      console.log(`💥 Status: ${error.response.status} ${error.response.statusText}`);
-      console.log('📦 Error Data:', JSON.stringify(error.response.data, null, 2));
-    } else if (error.request) {
-      console.log('📡 No response received from server');
+    // 🌐 NETWORK LOGGING - ERROR (silenciar 404 en polling de status)
+    const isStatusPolling = error.config?.url?.includes('register-winning-numbers/status');
+    const is404 = error.response?.status === 404;
+    
+    // Solo loggear errores 404 de status como advertencia leve
+    if (isStatusPolling && is404) {
+      console.log('⏳ Esperando que el operationId esté disponible...');
+    } else {
+      // Loggear otros errores normalmente
+      console.log('\n🔴 ===== NETWORK ERROR =====');
+      console.log(`📡 ${error.config?.method?.toUpperCase()} ${error.config?.url}`);
+      console.log(`❌ Error: ${error.message}`);
+      if (error.response) {
+        console.log(`💥 Status: ${error.response.status} ${error.response.statusText}`);
+        console.log('📦 Error Data:', JSON.stringify(error.response.data, null, 2));
+      } else if (error.request) {
+        console.log('📡 No response received from server');
+      }
+      console.log('⏱️  Timestamp:', new Date().toISOString());
+      console.log('============================\n');
     }
-    console.log('⏱️  Timestamp:', new Date().toISOString());
-    console.log('============================\n');
     
     // Manejar errores de red
     if (error.code === 'NETWORK_ERROR' || error.message === 'Network Error') {

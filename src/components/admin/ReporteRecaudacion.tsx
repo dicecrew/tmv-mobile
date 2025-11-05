@@ -81,10 +81,7 @@ const ReporteRecaudacion: React.FC = () => {
 
   // Procesar datos del reporte
   const processReportData = (data: any) => {
-    console.log('📊 processReportData - Datos recibidos:', data);
-    
     if (!data) {
-      console.log('📊 processReportData - No hay datos');
       return { listeros: [], totals: { totalCollected: 0, totalPaid: 0, netBalance: 0 } };
     }
 
@@ -92,21 +89,15 @@ const ReporteRecaudacion: React.FC = () => {
 
     if (Array.isArray(data)) {
       transactions = data;
-      console.log('📊 processReportData - Data es array directo');
     } else if (data.data) {
       if (Array.isArray(data.data)) {
         transactions = data.data;
-        console.log('📊 processReportData - Data.data es array');
       } else if (typeof data.data === 'object') {
         transactions = Object.values(data.data);
-        console.log('📊 processReportData - Data.data es objeto, convertido a array');
       }
     }
 
-    console.log('📊 processReportData - Transacciones extraídas:', transactions.length);
-
     if (transactions.length === 0) {
-      console.log('📊 processReportData - No hay transacciones para procesar');
       return { listeros: [], totals: { totalCollected: 0, totalPaid: 0, netBalance: 0 } };
     }
 
@@ -155,11 +146,6 @@ const ReporteRecaudacion: React.FC = () => {
 
     const listeros = Object.values(listerosMap);
 
-    console.log('📊 processReportData - Listeros procesados:', listeros.length);
-    console.log('📊 processReportData - Total recaudado:', totalCollected);
-    console.log('📊 processReportData - Total pagado:', totalPaid);
-    console.log('📊 processReportData - Balance neto:', totalCollected - totalPaid);
-
     return {
       listeros,
       totals: {
@@ -192,14 +178,8 @@ const ReporteRecaudacion: React.FC = () => {
 
       const response = await incomesLogService.getIncomesLogDateRange(params);
       
-      console.log('📊 Reporte - Respuesta completa:', response);
-      console.log('📊 Reporte - Respuesta data:', response.data);
-      console.log('📊 Reporte - Es array?:', Array.isArray(response.data));
-      
       setReportData(response.data || response);
       setShowReport(true);
-      
-      console.log('📊 Reporte - Datos guardados:', response.data || response);
     } catch (error) {
       console.error('Error loading report:', error);
       Toast.show({
@@ -241,13 +221,7 @@ const ReporteRecaudacion: React.FC = () => {
     }
   };
 
-  const processedData = useMemo(() => {
-    const result = processReportData(reportData);
-    console.log('📊 useMemo - processedData calculado:', result);
-    console.log('📊 useMemo - Tiene listeros?:', result?.listeros?.length || 0);
-    console.log('📊 useMemo - Totales:', result?.totals);
-    return result;
-  }, [reportData]);
+  const processedData = useMemo(() => processReportData(reportData), [reportData]);
 
   return (
     <View style={styles.container}>
@@ -297,13 +271,6 @@ const ReporteRecaudacion: React.FC = () => {
         </TouchableOpacity>
 
         {/* Resultados */}
-        {(() => {
-          console.log('📊 Render - showReport:', showReport);
-          console.log('📊 Render - isLoading:', isLoading);
-          console.log('📊 Render - processedData exists:', !!processedData);
-          console.log('📊 Render - Condición cumplida:', showReport && !isLoading && processedData);
-          return null;
-        })()}
         {showReport && !isLoading && processedData && (
           <ScrollView style={styles.reportResults}>
             {/* Resumen General */}
