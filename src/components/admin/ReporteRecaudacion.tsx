@@ -18,14 +18,18 @@ import { incomesLogService } from '../../api/services';
 interface Transaction {
   id: string;
   bookieId: string;
-  bookieName: string;
+  bookieName?: string;
   bookieUserName?: string;
   amount: number;
   isDeposit: boolean;
-  type: string;
-  date: string;
+  transactionDate: string;
   poolFinal?: number;
+  poolInicial?: number;
   comment?: string;
+  createdAt?: string;
+  createdBy?: string;
+  createdByUserName?: string;
+  updatedAt?: string;
 }
 
 interface ListeroReport {
@@ -59,7 +63,7 @@ const ReporteRecaudacion: React.FC = () => {
     setDateTo(dateTo);
   };
 
-  // Convertir fecha local a UTC
+  // Convertir fecha local a ISO string (manteniendo el offset de zona horaria)
   const convertLocalDateToUTC = (localDate: Date, isEndDate: boolean = false): string => {
     try {
       const date = new Date(localDate);
@@ -77,7 +81,10 @@ const ReporteRecaudacion: React.FC = () => {
 
   // Procesar datos del reporte
   const processReportData = (data: any) => {
+    console.log('📊 processReportData - Datos recibidos:', data);
+    
     if (!data) {
+      console.log('📊 processReportData - No hay datos');
       return { listeros: [], totals: { totalCollected: 0, totalPaid: 0, netBalance: 0 } };
     }
 
@@ -85,15 +92,21 @@ const ReporteRecaudacion: React.FC = () => {
 
     if (Array.isArray(data)) {
       transactions = data;
+      console.log('📊 processReportData - Data es array directo');
     } else if (data.data) {
       if (Array.isArray(data.data)) {
         transactions = data.data;
+        console.log('📊 processReportData - Data.data es array');
       } else if (typeof data.data === 'object') {
         transactions = Object.values(data.data);
+        console.log('📊 processReportData - Data.data es objeto, convertido a array');
       }
     }
 
+    console.log('📊 processReportData - Transacciones extraídas:', transactions.length);
+
     if (transactions.length === 0) {
+      console.log('📊 processReportData - No hay transacciones para procesar');
       return { listeros: [], totals: { totalCollected: 0, totalPaid: 0, netBalance: 0 } };
     }
 
@@ -117,9 +130,17 @@ const ReporteRecaudacion: React.FC = () => {
         };
       }
 
-      listerosMap[bookieId].transactions.push(transaction);
+      // Convertir transactionDate de UTC a hora local
+      const transactionWithLocalDate = {
+        ...transaction,
+        transactionDate: transaction.transactionDate
+      };
 
-      if (transaction.type === 'Paid' || transaction.isDeposit) {
+      listerosMap[bookieId].transactions.push(transactionWithLocalDate);
+
+      // isDeposit = true significa PAGO (dinero que sale)
+      // isDeposit = false significa RECAUDACIÓN (dinero que entra)
+      if (transaction.isDeposit === true) {
         listerosMap[bookieId].totalPaid += transaction.amount || 0;
         totalPaid += transaction.amount || 0;
       } else {
@@ -133,6 +154,11 @@ const ReporteRecaudacion: React.FC = () => {
     });
 
     const listeros = Object.values(listerosMap);
+
+    console.log('📊 processReportData - Listeros procesados:', listeros.length);
+    console.log('📊 processReportData - Total recaudado:', totalCollected);
+    console.log('📊 processReportData - Total pagado:', totalPaid);
+    console.log('📊 processReportData - Balance neto:', totalCollected - totalPaid);
 
     return {
       listeros,
@@ -165,8 +191,15 @@ const ReporteRecaudacion: React.FC = () => {
       };
 
       const response = await incomesLogService.getIncomesLogDateRange(params);
+      
+      console.log('📊 Reporte - Respuesta completa:', response);
+      console.log('📊 Reporte - Respuesta data:', response.data);
+      console.log('📊 Reporte - Es array?:', Array.isArray(response.data));
+      
       setReportData(response.data || response);
       setShowReport(true);
+      
+      console.log('📊 Reporte - Datos guardados:', response.data || response);
     } catch (error) {
       console.error('Error loading report:', error);
       Toast.show({
@@ -189,17 +222,32 @@ const ReporteRecaudacion: React.FC = () => {
     }));
   };
 
-  // Formatear fecha
+  // Formatear fecha UTC a hora local (misma lógica que versión web)
   const formatDateTime = (dateString: string): string => {
     try {
-      const date = new Date(dateString);
-      return date.toLocaleDateString() + ', ' + date.toLocaleTimeString();
+      const utcDate = new Date(dateString);
+      if (isNaN(utcDate.getTime())) {
+        return 'Fecha inválida';
+      }
+      
+      // Formatear la fecha con coma separando fecha y hora usando zona horaria local
+      const datePart = utcDate.toLocaleDateString();
+      const timePart = utcDate.toLocaleTimeString();
+      const result = `${datePart}, ${timePart}`;
+      return result;
     } catch (error) {
+      console.error('❌ Error convirtiendo fecha UTC a local:', dateString, error);
       return 'Fecha inválida';
     }
   };
 
-  const processedData = useMemo(() => processReportData(reportData), [reportData]);
+  const processedData = useMemo(() => {
+    const result = processReportData(reportData);
+    console.log('📊 useMemo - processedData calculado:', result);
+    console.log('📊 useMemo - Tiene listeros?:', result?.listeros?.length || 0);
+    console.log('📊 useMemo - Totales:', result?.totals);
+    return result;
+  }, [reportData]);
 
   return (
     <View style={styles.container}>
@@ -249,6 +297,13 @@ const ReporteRecaudacion: React.FC = () => {
         </TouchableOpacity>
 
         {/* Resultados */}
+        {(() => {
+          console.log('📊 Render - showReport:', showReport);
+          console.log('📊 Render - isLoading:', isLoading);
+          console.log('📊 Render - processedData exists:', !!processedData);
+          console.log('📊 Render - Condición cumplida:', showReport && !isLoading && processedData);
+          return null;
+        })()}
         {showReport && !isLoading && processedData && (
           <ScrollView style={styles.reportResults}>
             {/* Resumen General */}
@@ -310,12 +365,12 @@ const ReporteRecaudacion: React.FC = () => {
                         <View key={index} style={styles.transactionItem}>
                           <View style={styles.transactionHeader}>
                             <Text style={styles.transactionType}>
-                              {transaction.isDeposit || transaction.type === 'Paid' ? '💵 Pago' : '💰 Recaudación'}
+                              {transaction.isDeposit ? '💵 Pago' : '💰 Recaudación'}
                             </Text>
                             <Text
                               style={[
                                 styles.transactionAmount,
-                                transaction.isDeposit || transaction.type === 'Paid'
+                                transaction.isDeposit
                                   ? styles.amountPaid
                                   : styles.amountCollected,
                               ]}
@@ -324,7 +379,7 @@ const ReporteRecaudacion: React.FC = () => {
                             </Text>
                           </View>
                           <Text style={styles.transactionDate}>
-                            📅 {formatDateTime(transaction.date)}
+                            📅 {formatDateTime(transaction.transactionDate)}
                           </Text>
                           {transaction.comment && (
                             <Text style={styles.transactionComment}>💬 {transaction.comment}</Text>
@@ -342,15 +397,6 @@ const ReporteRecaudacion: React.FC = () => {
 
     </View>
   );
-};
-
-const formatDateTime = (dateString: string): string => {
-  try {
-    const date = new Date(dateString);
-    return date.toLocaleDateString() + ', ' + date.toLocaleTimeString();
-  } catch (error) {
-    return 'Fecha inválida';
-  }
 };
 
 const styles = StyleSheet.create({

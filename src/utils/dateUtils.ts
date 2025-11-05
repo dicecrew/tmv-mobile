@@ -10,11 +10,22 @@
 export const utcToLocal = (utcDate: string | Date | null): Date | null => {
   if (!utcDate) return null;
   
-  // Si es string, convertir a Date
-  const date = typeof utcDate === 'string' ? new Date(utcDate) : utcDate;
-  
-  // Crear nueva fecha en hora local
-  return new Date(date.getTime() - (date.getTimezoneOffset() * 60000));
+  try {
+    // Si es string, convertir a Date
+    const date = typeof utcDate === 'string' ? new Date(utcDate) : utcDate;
+    
+    // Verificar si la fecha es válida
+    if (isNaN(date.getTime())) {
+      console.warn('⚠️  utcToLocal: Invalid date received:', utcDate);
+      return null;
+    }
+    
+    // Crear nueva fecha en hora local
+    return new Date(date.getTime() - (date.getTimezoneOffset() * 60000));
+  } catch (error) {
+    console.error('❌ Error in utcToLocal:', error, 'Input:', utcDate);
+    return null;
+  }
 };
 
 /**
@@ -25,11 +36,22 @@ export const utcToLocal = (utcDate: string | Date | null): Date | null => {
 export const localToUtc = (localDate: string | Date | null): Date | null => {
   if (!localDate) return null;
   
-  // Si es string, convertir a Date
-  const date = typeof localDate === 'string' ? new Date(localDate) : localDate;
-  
-  // Crear nueva fecha en UTC
-  return new Date(date.getTime() + (date.getTimezoneOffset() * 60000));
+  try {
+    // Si es string, convertir a Date
+    const date = typeof localDate === 'string' ? new Date(localDate) : localDate;
+    
+    // Verificar si la fecha es válida
+    if (isNaN(date.getTime())) {
+      console.warn('⚠️  localToUtc: Invalid date received:', localDate);
+      return null;
+    }
+    
+    // Crear nueva fecha en UTC
+    return new Date(date.getTime() + (date.getTimezoneOffset() * 60000));
+  } catch (error) {
+    console.error('❌ Error in localToUtc:', error, 'Input:', localDate);
+    return null;
+  }
 };
 
 /**
@@ -193,7 +215,7 @@ export const utcObjectToLocal = (obj: any): any => {
   const dateFields = [
     'date', 'createdAt', 'updatedAt', 'startDate', 'endDate', 
     'birthDate', 'expiryDate', 'dueDate', 'publishedAt',
-    'startTime', 'endTime', 'time', 'timestamp'
+    'startTime', 'endTime', 'time', 'timestamp', 'transactionDate'
   ];
   
   Object.keys(converted).forEach(key => {
@@ -232,7 +254,7 @@ export const localObjectToUtc = (obj: any): any => {
   const dateFields = [
     'date', 'createdAt', 'updatedAt', 'startDate', 'endDate', 
     'birthDate', 'expiryDate', 'dueDate', 'publishedAt',
-    'startTime', 'endTime', 'time', 'timestamp'
+    'startTime', 'endTime', 'time', 'timestamp', 'transactionDate'
   ];
   
   Object.keys(converted).forEach(key => {

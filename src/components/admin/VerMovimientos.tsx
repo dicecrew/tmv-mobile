@@ -105,7 +105,7 @@ const VerMovimientos: React.FC = () => {
     setDateTo(dateTo);
   };
 
-  // Convertir fecha local a UTC
+  // Convertir fecha local a ISO string (manteniendo el offset de zona horaria)
   const convertLocalDateToUTC = (localDate: Date, isEndDate: boolean = false): string => {
     try {
       const date = new Date(localDate);
@@ -145,15 +145,56 @@ const VerMovimientos: React.FC = () => {
         params.bookieId = selectedBookie;
       }
 
+      console.log('📊 Aplicando filtros Ver Movimientos:', params);
+
       const response = await adminService.getBetResumeSummary(params);
-      setBetResumeData(response.data || response || []);
+      
+      console.log('📦 Respuesta completa:', response);
+      console.log('📦 Respuesta data:', response.data);
+      console.log('📦 Tipo de response:', typeof response);
+      console.log('📦 Es array response?:', Array.isArray(response));
+      console.log('📦 Es array response.data?:', Array.isArray(response.data));
+
+      // Manejar la respuesta correctamente
+      let dataToSet: DateData[] = [];
+      
+      if (response.data) {
+        // Si response.data existe, usarlo
+        if (Array.isArray(response.data)) {
+          dataToSet = response.data;
+        } else if (typeof response.data === 'object') {
+          // Si es un objeto, intentar convertir a array
+          dataToSet = Object.values(response.data);
+        }
+      } else if (Array.isArray(response)) {
+        // Si response es directamente un array
+        dataToSet = response;
+      }
+
+      console.log('📊 Datos procesados:', dataToSet);
+      console.log('📊 Cantidad de registros:', dataToSet.length);
+
+      setBetResumeData(dataToSet);
       setShowHistory(true);
+
+      if (dataToSet.length === 0) {
+        Toast.show({
+          type: 'info',
+          text1: 'Sin resultados',
+          text2: 'No se encontraron movimientos para los filtros seleccionados',
+          position: 'top',
+          topOffset: 60,
+        });
+      }
     } catch (error: any) {
-      console.error('Error fetching bet resume data:', error);
+      console.error('❌ Error fetching bet resume data:', error);
+      console.error('❌ Error response:', error.response);
+      console.error('❌ Error message:', error.message);
+      
       Toast.show({
         type: 'error',
         text1: 'Error',
-        text2: error.message || 'No se pudieron cargar los datos',
+        text2: error.response?.data?.message || error.message || 'No se pudieron cargar los datos',
         position: 'top',
         topOffset: 60,
       });
@@ -256,7 +297,7 @@ const VerMovimientos: React.FC = () => {
                   <ActivityIndicator size="small" color="white" />
                 ) : (
                   <>
-                    <Ionicons name="search-outline" size={20} color="white" />
+                    <Ionicons name="search-outline" size={16} color="white" />
                     <Text style={styles.filterButtonText}>APLICAR FILTROS</Text>
                   </>
                 )}
@@ -274,7 +315,7 @@ const VerMovimientos: React.FC = () => {
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
               >
-                <Ionicons name="close-outline" size={20} color="white" />
+                <Ionicons name="close-outline" size={16} color="white" />
                 <Text style={styles.filterButtonText}>LIMPIAR</Text>
               </LinearGradient>
             </TouchableOpacity>
@@ -383,19 +424,19 @@ const VerMovimientos: React.FC = () => {
                                 </View>
                               </View>
                               <View style={styles.betResumeDetails}>
-                                <View style={styles.detailRow}>
+                                <View key="inicialPool" style={styles.detailRow}>
                                   <Text style={styles.detailLabel}>Fondo Inicial:</Text>
                                   <Text style={[styles.detailValue, styles.valueBlue]}>
                                     ${formatAmount(betResume.inicialPool || 0)}
                                   </Text>
                                 </View>
-                                <View style={styles.detailRow}>
+                                <View key="totalAmount" style={styles.detailRow}>
                                   <Text style={styles.detailLabel}>Total Jugado:</Text>
                                   <Text style={[styles.detailValue, styles.valueGold]}>
                                     ${formatAmount(betResume.totalAmount || 0)}
                                   </Text>
                                 </View>
-                                <View style={styles.detailRow}>
+                                <View key="revenue" style={styles.detailRow}>
                                   <Text style={styles.detailLabel}>Ganancia Neta:</Text>
                                   <Text
                                     style={[
@@ -406,7 +447,7 @@ const VerMovimientos: React.FC = () => {
                                     ${formatAmount(betResume.revenue || 0)}
                                   </Text>
                                 </View>
-                                <View style={styles.detailRow}>
+                                <View key="endPool" style={styles.detailRow}>
                                   <Text style={styles.detailLabel}>Fondo Final:</Text>
                                   <Text style={[styles.detailValue, styles.valueGreen]}>
                                     ${formatAmount(betResume.endPool || 0)}
@@ -481,13 +522,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: spacing.sm,
+    gap: spacing.xs,
     paddingVertical: spacing.lg,
+    paddingHorizontal: spacing.sm,
   },
   filterButtonText: {
-    fontSize: fontSize.md,
+    fontSize: fontSize.sm,
     fontWeight: fontWeight.bold,
     color: 'white',
+    flexShrink: 1,
+    textAlign: 'center',
   },
   resultsSection: {
     flex: 1,

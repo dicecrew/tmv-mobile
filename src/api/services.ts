@@ -146,6 +146,13 @@ export const adminService = {
       url: `/api/Admin/register-winning-numbers/status/${operationId}`,
       method: 'GET'
     }),
+
+  // Actualizar tiempos de tirada
+  updateThrowTimes: (throwId: string, startTime: string, endTime: string) =>
+    customInstance<any>({
+      url: `/api/Admin/throw/${throwId}/update-times/${startTime}/${endTime}`,
+      method: 'PUT'
+    }),
 };
 
 // ===== SERVICIOS DE TIPOS DE JUEGO =====
@@ -570,7 +577,10 @@ export const incomesLogService = {
     customInstance<any>({
       url: '/api/IncomesLog/date-range',
       method: 'GET',
-      params
+      params: {
+        startDate: params.from,
+        endDate: params.to
+      }
     }),
 
   // Obtener por bookie y rango de fechas
@@ -578,7 +588,10 @@ export const incomesLogService = {
     customInstance<any>({
       url: `/api/IncomesLog/bookie/${bookieId}/date-range`,
       method: 'GET',
-      params
+      params: {
+        startDate: params.from,
+        endDate: params.to
+      }
     }),
 
   // Actualizar registro de ingreso

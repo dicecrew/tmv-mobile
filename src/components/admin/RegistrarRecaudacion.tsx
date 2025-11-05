@@ -408,9 +408,7 @@ const RegistrarRecaudacion: React.FC = () => {
                       ) : (
                         <>
                           <Ionicons name="checkmark-circle-outline" size={18} color="white" />
-                          <Text style={styles.confirmButtonText}>
-                            {actionType === 'collect' ? 'Confirmar Recaudación' : 'Confirmar Pago'}
-                          </Text>
+                          <Text style={styles.confirmButtonText}>Confirmar</Text>
                         </>
                       )}
                     </LinearGradient>
@@ -724,13 +722,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: spacing.sm,
+    gap: spacing.xs,
     paddingVertical: spacing.lg,
+    paddingHorizontal: spacing.sm,
   },
   confirmButtonText: {
-    fontSize: fontSize.sm,
+    fontSize: fontSize.xs,
     fontWeight: fontWeight.bold,
     color: 'white',
+    flexShrink: 1,
+    textAlign: 'center',
   },
 });
 

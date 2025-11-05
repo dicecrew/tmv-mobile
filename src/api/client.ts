@@ -20,7 +20,7 @@ const axiosInstance = axios.create({
   timeout: 10000,
 });
 
-// Interceptor para agregar token de autenticación
+// Interceptor para agregar token de autenticación y loggear requests
 axiosInstance.interceptors.request.use(
   async (config: InternalAxiosRequestConfig) => {
     const token = await AsyncStorage.getItem('jwt_token');
@@ -29,9 +29,28 @@ axiosInstance.interceptors.request.use(
       config.headers.Authorization = `Bearer ${token}`;
     }
     
+    // 🌐 NETWORK LOGGING - REQUEST
+    console.log('\n🔵 ===== NETWORK REQUEST =====');
+    console.log(`📡 ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`);
+    if (config.params) {
+      console.log('📋 Query Params:', JSON.stringify(config.params, null, 2));
+    }
+    if (config.data) {
+      console.log('📦 Request Body:', JSON.stringify(config.data, null, 2));
+    }
+    if (config.headers?.Authorization) {
+      const authHeader = String(config.headers.Authorization);
+      console.log('🔑 Auth:', authHeader.substring(0, 20) + '...');
+    }
+    console.log('⏱️  Timestamp:', new Date().toISOString());
+    console.log('===============================\n');
+    
     return config;
   },
   (error: AxiosError) => {
+    console.log('\n🔴 ===== NETWORK REQUEST ERROR =====');
+    console.log('❌ Error:', error.message);
+    console.log('====================================\n');
     return Promise.reject(error);
   }
 );
@@ -39,8 +58,34 @@ axiosInstance.interceptors.request.use(
 // Interceptor para manejar respuestas y errores
 axiosInstance.interceptors.response.use(
   (response: AxiosResponse) => {
+    // 🌐 NETWORK LOGGING - RESPONSE
+    console.log('\n🟢 ===== NETWORK RESPONSE =====');
+    console.log(`📡 ${response.config.method?.toUpperCase()} ${response.config.url}`);
+    console.log(`✅ Status: ${response.status} ${response.statusText}`);
+    console.log('📦 Response Data:', JSON.stringify(response.data, null, 2).substring(0, 500));
+    if (JSON.stringify(response.data).length > 500) {
+      console.log('... (response truncated, too long)');
+    }
+    console.log('⏱️  Timestamp:', new Date().toISOString());
+    console.log('===============================\n');
+    
     // Excluir endpoints de autenticación, throws y bet range de la conversión de fechas
-    const excludedEndpoints = ['/api/Auth/login', '/api/Auth/refresh', '/api/Auth/validate', '/api/Throw', '/api/Bet/user/range', '/api/Bookie/validate-bets', '/api/Bookie/users-bets-history', '/api/IncomesLog/income-register', '/api/Bookie', '/api/Admin/register-winning-numbers'];
+    const excludedEndpoints = [
+      '/api/Auth/login', 
+      '/api/Auth/refresh', 
+      '/api/Auth/validate', 
+      '/api/Throw', 
+      '/api/Bet/user/range', 
+      '/api/Bookie/validate-bets', 
+      '/api/Bookie/users-bets-history', 
+      '/api/IncomesLog/income-register',
+      '/api/IncomesLog/date-range',
+      '/api/Bookie', 
+      '/api/Admin/register-winning-numbers',
+      '/api/Admin/betresume-summary',
+      '/api/Admin/incomes-history',
+      '/api/Admin/bets-statistics'
+    ];
     const isExcludedEndpoint = excludedEndpoints.some(endpoint => 
       response.config.url?.includes(endpoint)
     );
@@ -53,6 +98,19 @@ axiosInstance.interceptors.response.use(
     return response;
   },
   async (error: AxiosError) => {
+    // 🌐 NETWORK LOGGING - ERROR
+    console.log('\n🔴 ===== NETWORK ERROR =====');
+    console.log(`📡 ${error.config?.method?.toUpperCase()} ${error.config?.url}`);
+    console.log(`❌ Error: ${error.message}`);
+    if (error.response) {
+      console.log(`💥 Status: ${error.response.status} ${error.response.statusText}`);
+      console.log('📦 Error Data:', JSON.stringify(error.response.data, null, 2));
+    } else if (error.request) {
+      console.log('📡 No response received from server');
+    }
+    console.log('⏱️  Timestamp:', new Date().toISOString());
+    console.log('============================\n');
+    
     // Manejar errores de red
     if (error.code === 'NETWORK_ERROR' || error.message === 'Network Error') {
       // Para errores de red, verificar si ya tenemos un token mock
@@ -75,6 +133,7 @@ axiosInstance.interceptors.response.use(
     const originalRequest = error.config as AxiosRequestConfig & { _retry?: boolean };
     
     if (error.response?.status === 401 && !originalRequest._retry) {
+      console.log('🔄 Intentando refrescar token debido a error 401...');
       originalRequest._retry = true;
       
       // Verificar si es un token mock
@@ -82,11 +141,19 @@ axiosInstance.interceptors.response.use(
       if (currentToken) {
         try {
           const decoded = JSON.parse(atob(currentToken.split('.')[1]));
+          console.log('🔍 Token decodificado:', {
+            sub: decoded.sub,
+            role: decoded.role || decoded['http://schemas.microsoft.com/ws/2008/06/identity/claims/role'],
+            exp: decoded.exp,
+            expDate: new Date(decoded.exp * 1000).toLocaleString()
+          });
+          
           if (decoded.sub === 'mock-user-id') {
+            console.log('⚠️  Usuario mock detectado, no se intenta refresh');
             return Promise.reject(error);
           }
         } catch (e) {
-          // Error decodificando token para verificar si es mock
+          console.error('❌ Error decodificando token:', e);
         }
       }
       
@@ -94,6 +161,7 @@ axiosInstance.interceptors.response.use(
         const refreshToken = await AsyncStorage.getItem('refresh_token');
         
         if (refreshToken) {
+          console.log('🔄 Refresh token encontrado, intentando renovar...');
           const response = await axios.post(`${baseURL}/api/Auth/refresh`, {
             refreshToken,
           });
@@ -101,16 +169,21 @@ axiosInstance.interceptors.response.use(
           const { accessToken } = response.data;
           
           if (accessToken) {
+            console.log('✅ Token renovado exitosamente');
             await AsyncStorage.setItem('jwt_token', accessToken);
             
             if (originalRequest.headers) {
               originalRequest.headers.Authorization = `Bearer ${accessToken}`;
             }
             
+            console.log('🔄 Reintentando petición original...');
             return axiosInstance(originalRequest);
           }
+        } else {
+          console.log('⚠️  No hay refresh token disponible');
         }
       } catch (refreshError) {
+        console.error('❌ Error al refrescar token:', refreshError);
         // Verificar si es un usuario mock antes de limpiar tokens
         const currentToken = await AsyncStorage.getItem('jwt_token');
         const isMockUser = currentToken && (
@@ -148,7 +221,21 @@ export const customInstance = <T>(
   };
 
   // Excluir endpoints de autenticación, throws y apuestas de la conversión de fechas
-  const excludedEndpoints = ['/api/Auth/login', '/api/Auth/refresh', '/api/Auth/validate', '/api/Throw', '/api/Bet/user-bet-play', '/api/Bet/user/range', '/api/IncomesLog/income-register', '/api/Bookie', '/api/Admin/register-winning-numbers'];
+  const excludedEndpoints = [
+    '/api/Auth/login', 
+    '/api/Auth/refresh', 
+    '/api/Auth/validate', 
+    '/api/Throw', 
+    '/api/Bet/user-bet-play', 
+    '/api/Bet/user/range', 
+    '/api/IncomesLog/income-register',
+    '/api/IncomesLog/date-range',
+    '/api/Bookie', 
+    '/api/Admin/register-winning-numbers',
+    '/api/Admin/betresume-summary',
+    '/api/Admin/incomes-history',
+    '/api/Admin/bets-statistics'
+  ];
   const isExcludedEndpoint = excludedEndpoints.some(endpoint => 
     finalConfig.url?.includes(endpoint)
   );

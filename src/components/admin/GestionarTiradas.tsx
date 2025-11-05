@@ -15,7 +15,7 @@ import { colors, spacing, borderRadius, fontSize, fontWeight } from '../../style
 import Card from '../common/Card';
 import DatePicker from '../common/DatePicker';
 import Toast from 'react-native-toast-message';
-import { throwService } from '../../api/services';
+import { throwService, adminService } from '../../api/services';
 
 interface Tirada {
   id: string;
@@ -131,20 +131,12 @@ const GestionarTiradas: React.FC = () => {
 
     setLoading(true);
     try {
-      // Usar el endpoint especial de actualización de tiempos
-      const response = await fetch(
-        `https://api.themoneyvice.com/api/Admin/throw/${editTiradaData.id}/update-times/${startTimeUTC}/${endTimeUTC}`,
-        {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        }
+      // Usar el servicio de administración para actualizar tiempos
+      await adminService.updateThrowTimes(
+        editTiradaData.id,
+        startTimeUTC,
+        endTimeUTC
       );
-
-      if (!response.ok) {
-        throw new Error('Error al actualizar tirada');
-      }
 
       Toast.show({
         type: 'success',
