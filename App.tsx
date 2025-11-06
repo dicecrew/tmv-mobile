@@ -7,6 +7,7 @@ import { AuthProvider } from './src/contexts/AuthContext';
 import LoginScreen from './src/screens/LoginScreen';
 import DashboardScreen from './src/screens/DashboardScreen';
 import Toast from 'react-native-toast-message';
+import { PortalProvider } from './src/components/common/Portal';
 
 // Configuración de React Query sin caché (igual que en el proyecto web)
 const queryClient = new QueryClient({
@@ -29,6 +30,7 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
+        <PortalProvider>
         <NavigationContainer>
           <StatusBar style="light" />
           <Stack.Navigator
@@ -43,6 +45,7 @@ export default function App() {
           </Stack.Navigator>
           <Toast />
         </NavigationContainer>
+        </PortalProvider>
       </AuthProvider>
     </QueryClientProvider>
   );

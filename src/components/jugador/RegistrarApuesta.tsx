@@ -10,8 +10,6 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
-  Dimensions,
-  Modal,
 } from 'react-native';
 import Combobox, { ComboboxOption } from '../common/Combobox';
 import { Ionicons } from '@expo/vector-icons';
@@ -21,6 +19,7 @@ import Card from '../common/Card';
 import Toast from 'react-native-toast-message';
 import { betService, lotteryService, throwService, playTypeService } from '../../api/services';
 import { useAuth } from '../../contexts/AuthContext';
+import FloatingKeyboardModal from './FloatingKeyboardModal';
 
 interface Lottery {
   id: string;
@@ -82,7 +81,6 @@ const formatAmount = (amount: number): string => {
 
 const RegistrarApuesta: React.FC = () => {
   const { user } = useAuth();
-  const { width: screenWidth } = Dimensions.get('window');
   const numbersInputRef = useRef<TextInput>(null);
 
   // Estados principales
@@ -1979,199 +1977,53 @@ const RegistrarApuesta: React.FC = () => {
               </ScrollView>
       </KeyboardAvoidingView>
       
-      {/* Botón flotante para mostrar modal cuando está oculto - POSICIONADO ABSOLUTAMENTE RESPECTO A LA PANTALLA */}
-      {!isFloatingModalVisible && (
-        <View style={styles.floatingButtonOverlay}>
-          <TouchableOpacity
-            style={styles.showModalButton}
-            onPress={() => setIsFloatingModalVisible(true)}
-          >
-            <Ionicons name="keypad-outline" size={24} color="white" />
-          </TouchableOpacity>
-        </View>
-      )}
+      <FloatingKeyboardModal
+        isVisible={isFloatingModalVisible}
+        onToggle={() => setIsFloatingModalVisible(!isFloatingModalVisible)}
+        playTypes={playTypes}
+        selectedTypes={selectedTypes}
+        availableTypes={availableTypes}
+        onToggleType={toggleType}
+        onAddNumber={addNumber}
+        onAddComma={addComma}
+        onBackspace={backspace}
+        onAddDecimalPoint={addDecimalPoint}
+        onApplyAl={applyAl}
+        onClearAll={clearAll}
+        onSeparatePlay={separatePlay}
+        onCopyToAll={() => {
+          // Función para copiar monto a todos los números
+          const numbers = getIndividualNumbers();
+          if (numbers.length === 0) return;
 
-      {/* Modal Flotante con Botones - POSICIONADO ABSOLUTAMENTE RESPECTO A LA PANTALLA */}
-      {isFloatingModalVisible && (
-        <View style={styles.floatingModalContainer}>
-          <View style={styles.floatingModalContent}>
-
-          {/* Botones de Tipos de Juego */}
-            <View style={styles.floatingTypesGrid} pointerEvents="auto">
-            {playTypes.map(type => {
-              const isAvailable = availableTypes.includes(type.name);
-                return (
-                  <TouchableOpacity
-                    key={type.id}
-                    style={[
-                      styles.floatingTypeButton,
-                      selectedTypes.includes(type.name) && styles.floatingTypeButtonSelected,
-                    selectedTypes.includes(type.name) && {
-                      backgroundColor: PLAY_TYPE_COLORS[type.name] || colors.primaryGold,
-                      borderColor: PLAY_TYPE_COLORS[type.name] || colors.primaryGold,
-                    },
-                      !isAvailable && styles.floatingTypeButtonDisabled
-                  ]}
-                  onPress={() => toggleType(type.name)}
-                    disabled={!isAvailable}
-                  >
-                  <Text
-                    style={[
-                        styles.floatingTypeButtonText,
-                        selectedTypes.includes(type.name) && styles.floatingTypeButtonTextSelected,
-                        !isAvailable && styles.floatingTypeButtonTextDisabled
-                    ]}
-                  >
-                          {type.name}
-                        </Text>
-                  </TouchableOpacity>
-                );
-              })}
-          </View>
-
-          {/* Teclado numérico */}
-            <View style={styles.floatingKeyboard} pointerEvents="auto">
-              <View style={styles.floatingKeyboardRow}>
-              {['7', '8', '9'].map(num => (
-                <TouchableOpacity
-                  key={num}
-                    style={styles.floatingNumberKey}
-                  onPress={() => addNumber(num)}
-                >
-                    <Text style={styles.floatingNumberKeyText}>{num}</Text>
-                </TouchableOpacity>
-              ))}
-                    </View>
-              <View style={styles.floatingKeyboardRow}>
-              {['4', '5', '6'].map(num => (
-                <TouchableOpacity
-                  key={num}
-                    style={styles.floatingNumberKey}
-                  onPress={() => addNumber(num)}
-                >
-                    <Text style={styles.floatingNumberKeyText}>{num}</Text>
-                </TouchableOpacity>
-                  ))}
-                </View>
-              <View style={styles.floatingKeyboardRow}>
-              {['1', '2', '3'].map(num => (
-                <TouchableOpacity
-                  key={num}
-                    style={styles.floatingNumberKey}
-                  onPress={() => addNumber(num)}
-                >
-                    <Text style={styles.floatingNumberKeyText}>{num}</Text>
-                </TouchableOpacity>
-              ))}
-              </View>
-              <View style={styles.floatingKeyboardRow}>
-              <TouchableOpacity
-                  style={styles.floatingNumberKey}
-                onPress={addDecimalPoint}
-              >
-                  <Text style={styles.floatingNumberKeyText}>.</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                  style={styles.floatingNumberKey}
-                onPress={() => addNumber('0')}
-              >
-                  <Text style={styles.floatingNumberKeyText}>0</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                  style={styles.floatingNumberKey}
-                onPress={backspace}
-              >
-                  <Text style={styles.floatingNumberKeyText}>←</Text>
-              </TouchableOpacity>
-                      </View>
-              </View>
-              
-          {/* Botones de acción */}
-            <View style={styles.floatingActionButtons} pointerEvents="auto">
-            <TouchableOpacity
-                style={[styles.floatingActionButton, styles.floatingCopyButton]}
-              onPress={() => {
-                // Función para copiar monto a todos los números
-                const numbers = getIndividualNumbers();
-                if (numbers.length === 0) return;
-
-                selectedTypes.forEach(typeName => {
-                  const currentInput = typeAmountInputs[typeName] || '';
-                  const amountLines = currentInput.split('\n').filter(line => line.trim() !== '');
-                  
-                  if (amountLines.length > 0) {
-                    const firstAmount = amountLines[0];
-                    
-                    if (typeName === 'Parlet') {
-                      setTypeAmountInputs(prev => ({
-                        ...prev,
-                        [typeName]: firstAmount
-                      }));
-                    } else {
-                      const newAmounts = numbers.map(() => firstAmount).join('\n');
-                      setTypeAmountInputs(prev => ({
-                        ...prev,
-                        [typeName]: newAmounts
-                      }));
-                    }
-                  }
-                });
-              }}
-              disabled={availableTypes.length === 0}
-            >
-                <Text style={styles.floatingActionButtonText}>Todos</Text>
-            </TouchableOpacity>
-              
-              <TouchableOpacity
-                style={[styles.floatingActionButton, styles.floatingAlButton]}
-              onPress={applyAl}
-              disabled={getIndividualNumbers().length !== 1}
-            >
-                <Text style={styles.floatingActionButtonText}>AL</Text>
-              </TouchableOpacity>
+          selectedTypes.forEach(typeName => {
+            const currentInput = typeAmountInputs[typeName] || '';
+            const amountLines = currentInput.split('\n').filter(line => line.trim() !== '');
             
-        <TouchableOpacity
-                style={[styles.floatingActionButton, styles.floatingEnterButton]}
-              onPress={addComma}
-            >
-                <Text style={styles.floatingActionButtonText}>Enter</Text>
-        </TouchableOpacity>
-          </View>
-        
-          {/* Botones Eliminar y Separar Jugada */}
-            <View style={styles.floatingBottomButtons} pointerEvents="auto">
-        <TouchableOpacity
-                style={[styles.floatingActionButton, styles.floatingClearButton]}
-              onPress={clearAll}
-              disabled={!currentNumbers && allPlays.length === 0}
-            >
-                <Text style={styles.floatingActionButtonText}>🗑️ Eliminar</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity
-                style={[styles.floatingActionButton, styles.floatingSeparateButton]}
-              onPress={separatePlay}
-              disabled={!currentNumbers || selectedTypes.length === 0 || calculateCurrentAmount() <= 0}
-            >
-                <Text style={styles.floatingActionButtonText}>🎯 Separar Jugada</Text>
-        </TouchableOpacity>
-      </View>
-
-            {/* Botón para ocultar/mostrar modal */}
-            <TouchableOpacity
-              style={styles.floatingToggleButton}
-              onPress={() => setIsFloatingModalVisible(!isFloatingModalVisible)}
-            >
-              <Ionicons 
-                name={isFloatingModalVisible ? "chevron-down" : "chevron-up"} 
-                size={20} 
-                color={colors.primaryGold} 
-              />
-            </TouchableOpacity>
-
-          </View>
-        </View>
-      )}
+            if (amountLines.length > 0) {
+              const firstAmount = amountLines[0];
+              
+              if (typeName === 'Parlet') {
+                setTypeAmountInputs(prev => ({
+                  ...prev,
+                  [typeName]: firstAmount
+                }));
+              } else {
+                const newAmounts = numbers.map(() => firstAmount).join('\n');
+                setTypeAmountInputs(prev => ({
+                  ...prev,
+                  [typeName]: newAmounts
+                }));
+              }
+            }
+          });
+        }}
+        getIndividualNumbers={getIndividualNumbers}
+        currentNumbers={currentNumbers}
+        allPlays={allPlays}
+        typeAmountInputs={typeAmountInputs}
+        calculateCurrentAmount={calculateCurrentAmount}
+      />
       
     </View>
   );
@@ -2684,227 +2536,6 @@ const styles = StyleSheet.create({
     color: 'white',
     fontFamily: 'monospace',
     marginTop: spacing.xs,
-  },
-  // Estilos del Modal Flotante
-  floatingModalContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'transparent',
-    zIndex: 999,
-    height: '100%',
-    width: '100%',
-    justifyContent: 'flex-end',
-    alignItems: 'center',
-    pointerEvents: 'box-none',
-  },
-  floatingModalContent: {
-    backgroundColor: 'transparent',
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.xl,
-    paddingHorizontal: spacing.md,
-    width: '100%',
-    marginBottom: 20,
-    pointerEvents: 'auto',
-  },
-  floatingTypesGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.xs,
-    marginBottom: spacing.sm,
-    backgroundColor: colors.darkBackground,
-    borderTopWidth: 2,
-    borderTopColor: colors.primaryGold,
-    borderTopLeftRadius: borderRadius.lg,
-    borderTopRightRadius: borderRadius.lg,
-    padding: spacing.sm,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: -4,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 10,
-  },
-  floatingTypeButton: {
-    flex: 1,
-    minWidth: '22%',
-    backgroundColor: colors.darkBackground,
-    borderWidth: 1,
-    borderColor: colors.inputBorder,
-    borderRadius: borderRadius.sm,
-    paddingVertical: spacing.xs,
-    paddingHorizontal: spacing.xs,
-    alignItems: 'center',
-  },
-  floatingTypeButtonSelected: {
-    borderWidth: 2,
-  },
-  floatingTypeButtonDisabled: {
-    opacity: 0.4,
-  },
-  floatingTypeButtonText: {
-    fontSize: fontSize.xs,
-    fontWeight: fontWeight.bold,
-    color: colors.lightText,
-  },
-  floatingTypeButtonTextSelected: {
-    color: 'white',
-  },
-  floatingTypeButtonTextDisabled: {
-    color: colors.subtleGrey,
-  },
-  floatingKeyboard: {
-    marginBottom: spacing.sm,
-    backgroundColor: colors.darkBackground,
-    padding: spacing.sm,
-    borderRadius: borderRadius.md,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-  floatingKeyboardRow: {
-    flexDirection: 'row',
-    gap: spacing.xs,
-    marginBottom: spacing.xs,
-  },
-  floatingNumberKey: {
-    flex: 1,
-    backgroundColor: colors.darkBackground,
-    borderWidth: 1,
-    borderColor: colors.inputBorder,
-    borderRadius: borderRadius.sm,
-    paddingVertical: spacing.sm,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 40,
-  },
-  floatingNumberKeyText: {
-    fontSize: fontSize.md,
-    fontWeight: fontWeight.heavy,
-    color: colors.lightText,
-  },
-  floatingActionButtons: {
-    flexDirection: 'row',
-    gap: spacing.xs,
-    marginBottom: spacing.xs,
-    backgroundColor: colors.darkBackground,
-    padding: spacing.sm,
-    borderRadius: borderRadius.md,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-  floatingBottomButtons: {
-    flexDirection: 'row',
-    gap: spacing.xs,
-    marginBottom: spacing.sm,
-    backgroundColor: colors.darkBackground,
-    padding: spacing.sm,
-    borderRadius: borderRadius.md,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-  floatingActionButton: {
-    flex: 1,
-    borderRadius: borderRadius.sm,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.sm,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 40,
-  },
-  floatingCopyButton: {
-    backgroundColor: colors.primaryGold,
-  },
-  floatingAlButton: {
-    backgroundColor: colors.primaryGold,
-  },
-  floatingEnterButton: {
-    backgroundColor: colors.primaryGold,
-  },
-  floatingClearButton: {
-    backgroundColor: colors.primaryRed,
-  },
-  floatingSeparateButton: {
-    backgroundColor: '#22c55e',
-  },
-  floatingActionButtonText: {
-    fontSize: fontSize.xs,
-    fontWeight: fontWeight.bold,
-    color: 'white',
-  },
-  floatingToggleButton: {
-    position: 'absolute',
-    top: -15,
-    right: 20,
-    backgroundColor: colors.darkBackground,
-    borderWidth: 2,
-    borderColor: colors.primaryGold,
-    borderRadius: 15,
-    width: 30,
-    height: 30,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-  floatingButtonOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'transparent',
-    pointerEvents: 'box-none',
-    zIndex: 1000,
-  },
-  showModalButton: {
-    position: 'absolute',
-    bottom: 20,
-    left: Dimensions.get('window').width / 2 - 25, // Centrado horizontalmente en la pantalla completa
-    backgroundColor: colors.primaryGold,
-    borderRadius: 25,
-    width: 50,
-    height: 50,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 20,
-    borderWidth: 2,
-    borderColor: colors.primaryGold,
-    zIndex: 9999,
   },
 });
 
