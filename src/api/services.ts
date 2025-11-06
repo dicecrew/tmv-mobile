@@ -4,48 +4,40 @@ import { customInstance } from './client';
 export const authService = {
   // Login usando el cliente personalizado
   login: async (credentials: { phoneNumber: string; password: string }) => {
-    console.log('authService.login - Credentials:', credentials);
     const response = await customInstance<any>({
       url: '/api/Auth/login',
       method: 'POST',
       data: credentials
     });
-    console.log('authService.login - Response:', response);
     return response.data;
   },
 
   // Validar token usando el cliente personalizado
   validateToken: async (token: string) => {
-    console.log('authService.validateToken - Token:', token);
     const response = await customInstance<any>({
       url: '/api/Auth/validate',
       method: 'POST',
       data: { token }
     });
-    console.log('authService.validateToken - Response:', response);
     return response.data;
   },
 
   // Refresh token usando el cliente personalizado
   refreshToken: async (refreshToken: string) => {
-    console.log('authService.refreshToken - Refresh token:', refreshToken);
     const response = await customInstance<any>({
       url: '/api/Auth/refresh',
       method: 'POST',
       data: { refreshToken }
     });
-    console.log('authService.refreshToken - Response:', response);
     return response.data;
   },
 
   // Logout usando el cliente personalizado
   logout: async () => {
-    console.log('authService.logout - Logging out');
     const response = await customInstance<any>({
       url: '/api/Auth/logout',
       method: 'POST'
     });
-    console.log('authService.logout - Response:', response);
     return response.data;
   },
 };
@@ -223,10 +215,6 @@ export const betService = {
 
   // Enviar apuesta de usuario
   sendUserBetPlay: (userBetPlayData: any) => {
-    console.log('🎯 betService.sendUserBetPlay - Datos a enviar:', JSON.stringify(userBetPlayData, null, 2));
-    console.log('🎯 betService.sendUserBetPlay - URL correcta según Swagger:', '/api/Bet/user-bet-play');
-    console.log('🎯 betService.sendUserBetPlay - Method:', 'POST');
-    
     return customInstance<any>({
       url: '/api/Bet/user-bet-play',
       method: 'POST',
@@ -307,11 +295,6 @@ export const throwService = {
 
   // Obtener lanzamientos activos por lotería y tiempo
   getActiveThrowsByLotteryForTime: (lotteryId: string, utcTime: string) => {
-    console.log('🔍 throwService.getActiveThrowsByLotteryForTime - Parámetros:');
-    console.log('  - lotteryId:', lotteryId);
-    console.log('  - utcTime:', utcTime);
-    console.log('  - URL completa:', `/api/Throw/lottery/${lotteryId}/active-for-time?utcTime=${encodeURIComponent(utcTime)}`);
-    
     return customInstance<any>({
       url: `/api/Throw/lottery/${lotteryId}/active-for-time`,
       method: 'GET',

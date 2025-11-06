@@ -168,7 +168,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       );
       
       if (isMockUser) {
-        console.log('AuthContext - Usuario mock detectado, saltando logout del servidor');
         setUser(null);
         setError(null);
         return;
@@ -282,8 +281,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       const response = await authService.login({ phoneNumber: phone, password });
       
-      console.log('AuthContext - Login response:', response);
-      
       // Guardar token en AsyncStorage
       await AsyncStorage.setItem('jwt_token', response.token);
       
@@ -321,8 +318,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                          errorMessage.includes('UUID') || errorDetails.includes('UUID');
       
       if (isNetworkError || isServerError || isUuidError) {
-        console.log('AuthContext - Error de red o servidor detectado, usando modo de desarrollo');
-        
         const mockToken = createMockToken(phone, password);
         const mockUser = createMockUser(phone, password);
         

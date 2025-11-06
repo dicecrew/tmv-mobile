@@ -76,13 +76,10 @@ const MisApuestas: React.FC = () => {
       };
 
       const response = await betService.getUserBetsRange(params);
-      console.log('🎯 Respuesta completa del endpoint /api/Bet/user/range:', JSON.stringify(response, null, 2));
 
       // Procesar respuesta para aplanar estructura
       const flattenedBets: Bet[] = [];
       const apiData = response?.data || response;
-
-      console.log('🎯 Datos de la API procesados:', JSON.stringify(apiData, null, 2));
 
       if (apiData && apiData.lotteries) {
         apiData.lotteries.forEach((lottery: any) => {
@@ -112,7 +109,6 @@ const MisApuestas: React.FC = () => {
         }
       }
 
-      console.log('🎯 Apuestas procesadas:', flattenedBets.length, flattenedBets);
       setBets(flattenedBets);
       setShowHistory(true);
       setShowFilters(false); // Ocultar filtros después de buscar

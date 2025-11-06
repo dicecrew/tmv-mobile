@@ -257,7 +257,6 @@ const RegistrarApuesta: React.FC = () => {
         typeof lottery.name === 'string'
       );
 
-      console.log('🎯 Loterías cargadas:', validLotteries.length, validLotteries);
       setLotteries(validLotteries);
 
       // Manejar selección de lotería por defecto
@@ -268,17 +267,13 @@ const RegistrarApuesta: React.FC = () => {
           
           if (isDefaultLotteryAvailable) {
             setSelectedLotteryId(user.defaultLotteryId);
-            console.log('🎯 Lotería por defecto del usuario seleccionada:', user.defaultLotteryId, user.defaultLotteryName);
           } else {
-            console.warn('⚠️ Lotería por defecto del usuario no está disponible en las loterías activas');
             setSelectedLotteryId(validLotteries[0].id);
-            console.log('🎯 Primera lotería disponible seleccionada:', validLotteries[0].name);
           }
         } else {
           // Si no hay lotería por defecto del usuario, seleccionar la primera disponible
           if (!selectedLotteryId) {
             setSelectedLotteryId(validLotteries[0].id);
-            console.log('🎯 Primera lotería disponible seleccionada:', validLotteries[0].name);
           }
         }
       }
@@ -307,8 +302,6 @@ const RegistrarApuesta: React.FC = () => {
 
     setIsLoadingThrows(true);
     try {
-      console.log('🔄 Cargando throws para lotería:', lotteryId);
-      
       // Validar que el lotteryId sea válido
       if (!lotteryId || typeof lotteryId !== 'string' || lotteryId.trim() === '') {
         throw new Error('ID de lotería inválido');
@@ -316,18 +309,13 @@ const RegistrarApuesta: React.FC = () => {
       
       // Usar el endpoint correcto del proyecto web: active-for-time
       const utcTime = new Date().toISOString();
-      console.log('🔄 Usando endpoint: /api/Throw/lottery/' + lotteryId + '/active/for-time');
-      console.log('🔄 Fecha UTC:', utcTime);
       
       let response;
       try {
         response = await throwService.getActiveThrowsByLotteryForTime(lotteryId, utcTime);
-        console.log('✅ Throws cargados con active-for-time:', response);
       } catch (activeForTimeError) {
-        console.warn('⚠️ Error con active-for-time, usando fallback active:', activeForTimeError);
         // Fallback al endpoint active si active-for-time falla
         response = await throwService.getActiveThrowsByLottery(lotteryId);
-        console.log('✅ Throws cargados con fallback active:', response);
       }
 
       let throwsArray: any[] = [];
@@ -363,13 +351,11 @@ const RegistrarApuesta: React.FC = () => {
         typeof throwItem.name === 'string'
       );
 
-      console.log('🎯 Tiradas cargadas para lotería', lotteryId, ':', validThrows.length, validThrows);
       setThrows(validThrows);
 
       // Siempre seleccionar la primera tirada activa (solo hay una tirada activa)
       if (validThrows.length > 0) {
         setSelectedThrowId(validThrows[0].id);
-        console.log('🎯 Tirada activa seleccionada automáticamente:', validThrows[0].name);
         
         // Mostrar mensaje informativo si se cargaron throws
         Toast.show({
@@ -382,7 +368,6 @@ const RegistrarApuesta: React.FC = () => {
         });
     } else {
         setSelectedThrowId('');
-        console.log('⚠️ No hay tiradas disponibles para esta lotería');
         
         // Mostrar mensaje informativo cuando no hay throws
         Toast.show({
@@ -465,7 +450,6 @@ const RegistrarApuesta: React.FC = () => {
         typeof type.name === 'string'
       );
 
-      console.log('🎯 Tipos de juego cargados:', validTypes.length, validTypes);
       setPlayTypes(validTypes);
     } catch (error) {
       console.error('❌ Error loading play types:', error);
@@ -695,7 +679,6 @@ const RegistrarApuesta: React.FC = () => {
   useEffect(() => {
     // Cargar datos iniciales de manera secuencial para mejor control
     const initializeData = async () => {
-      console.log('🚀 Inicializando datos del componente...');
       try {
         // Cargar tipos de juego primero
         await loadPlayTypes();
@@ -705,9 +688,7 @@ const RegistrarApuesta: React.FC = () => {
         
         // Esperar a que las loterías se carguen antes de continuar
         // La función loadActiveLotteries ya maneja la selección de la lotería por defecto
-        console.log('✅ Datos inicializados correctamente');
       } catch (error) {
-        console.error('❌ Error inicializando datos:', error);
       }
     };
 
@@ -1532,11 +1513,6 @@ const RegistrarApuesta: React.FC = () => {
                 betPlays: betPlays
               };
 
-              console.log('🎯 Datos de apuesta a enviar:', JSON.stringify(betData, null, 2));
-              console.log('🎯 Número de jugadas:', finalPlays.length);
-              console.log('🎯 Throw ID:', selectedThrowId);
-              console.log('🎯 Fecha UTC:', utcDateTime);
-
               await betService.sendUserBetPlay(betData);
 
               const totalAmount = finalPlays.reduce((total, play) => total + play.amount, 0);
@@ -1626,7 +1602,6 @@ const RegistrarApuesta: React.FC = () => {
 
       // Validar que la fecha sea válida
       if (isNaN(endTime.getTime())) {
-        console.warn('⚠️ Fecha de fin de tirada inválida:', activeThrow.endTime);
         return { status: 'error', color: '#ef4444', text: 'Fecha inválida' };
       }
 
@@ -1714,7 +1689,6 @@ const RegistrarApuesta: React.FC = () => {
                   options={lotteryOptions}
                   selectedValue={selectedLotteryId}
                   onValueChange={(value) => {
-                    console.log('🎯 Lotería seleccionada:', value);
                     setSelectedLotteryId(value);
                     setSelectedThrowId(''); // Limpiar tirada al cambiar lotería
                   }}
