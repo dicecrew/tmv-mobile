@@ -30,10 +30,19 @@ interface BetPlay {
   moves?: Move[];
 }
 
+interface MoveDetail {
+  number?: string;
+  secondNumber?: string;
+  amount?: number;
+  profit?: number;
+}
+
 interface Move {
   totalAmount: number;
   profit: number;
   numbers?: string;
+  moveDetails?: MoveDetail[];
+  playTypeName?: string;
 }
 
 interface DateGroup {
@@ -310,6 +319,54 @@ const MisApuestas: React.FC = () => {
     return amount.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
   };
 
+  const getPlayTypeColor = (playTypeName: string): string => {
+    switch (playTypeName?.toLowerCase()) {
+      case 'fijo':
+        return '#2563eb';
+      case 'corrido':
+        return '#16a34a';
+      case 'centena':
+        return '#7c3aed';
+      case 'parlet':
+        return '#dc2626';
+      default:
+        return colors.primaryGold;
+    }
+  };
+
+  const getMoveNumberList = (betPlayName: string, move: Move): string[] => {
+    if (move.moveDetails?.length) {
+      return move.moveDetails
+        .map(detail => {
+          const baseNumber = detail.number?.toString().trim() ?? '';
+          const second = detail.secondNumber?.toString().trim();
+
+          const formattedNumber = baseNumber || 'N/A';
+
+          if ((betPlayName?.toLowerCase() === 'parlet' || betPlayName?.toLowerCase() === 'parlay') && second) {
+            return `${formattedNumber}X${second}`;
+          }
+
+          if (!formattedNumber) {
+            return null;
+          }
+
+          return formattedNumber;
+        })
+        .filter(Boolean)
+        .map(value => value!);
+    }
+
+    if (move.numbers) {
+      return move.numbers
+        .split(/[\s,]+/)
+        .map(num => num.trim())
+        .filter(Boolean);
+    }
+
+    return [];
+  };
+
   // Limpiar filtros
   const handleClearFilters = () => {
     setFromDate(getSevenDaysAgo());
@@ -460,9 +517,9 @@ const MisApuestas: React.FC = () => {
                             <View style={styles.betCardHeaderLeft}>
                               <Ionicons name="business-outline" size={16} color={colors.lightText} />
                               <Text style={styles.betCardTitle}>
-                                {bet.lotteryName} • {bet.throwName} • {bet.id}
-            </Text>
-          </View>
+                                {bet.lotteryName} • {bet.throwName}
+                              </Text>
+                            </View>
                             <View style={styles.betCardStatus}>
                               <Ionicons name="help-circle-outline" size={16} color={colors.lightText} />
                               <Text style={styles.betCardStatusText}>{getBetStatus(bet)}</Text>
@@ -477,9 +534,6 @@ const MisApuestas: React.FC = () => {
                             <Text style={styles.betCardDate}>
                               Fecha: {formatShortDate(bet.date)} {new Date(bet.date).toLocaleTimeString('es-ES')}
             </Text>
-                            <Text style={styles.betCardCloseTime}>
-                              Hora de Cierre: {new Date(bet.date).toLocaleTimeString('es-ES')}
-                            </Text>
                             <View style={styles.betCardThrowStatus}>
                               <Text style={styles.betCardThrowStatusLabel}>Estado Tirada:</Text>
                               <Ionicons name="hourglass-outline" size={16} color={colors.primaryGold} />
@@ -508,16 +562,44 @@ const MisApuestas: React.FC = () => {
                                     </Text>
                                   </View>
                                   
-                                  {betPlay.moves?.map((move, moveIdx) => (
-                                    <View key={moveIdx} style={styles.jugadaMove}>
-                                      <Text style={styles.jugadaMoveType}>{betPlay.playTypeName}</Text>
-                                      <Text style={styles.jugadaMoveNumbers}>{move.numbers || 'N/A'}</Text>
-                                      <Text style={styles.jugadaMoveAmount}>${formatAmount(move.totalAmount || 0)}</Text>
-                                      <Text style={[styles.jugadaMoveProfit, { color: (move.profit || 0) >= 0 ? '#22c55e' : '#ef4444' }]}>
-                                        ${formatAmount(move.profit || 0)}
-                                      </Text>
-                                    </View>
-                                  ))}
+                                  {betPlay.moves?.map((move, moveIdx) => {
+                                    const movePlayTypeName = move.playTypeName || betPlay.playTypeName;
+                                    const playColor = getPlayTypeColor(movePlayTypeName || '');
+                                    const numbersList = getMoveNumberList(movePlayTypeName || '', move);
+
+                                    return (
+                                      <View key={moveIdx} style={styles.jugadaMoveRow}>
+                                        <Text style={[styles.jugadaMoveTypeCol, { color: playColor }]}>
+                                          {movePlayTypeName}
+                                        </Text>
+
+                                        <View style={styles.jugadaMoveNumbersCol}>
+                                          {numbersList.length > 0 ? (
+                                            numbersList.map((num, chipIdx) => (
+                                              <View
+                                                key={`${moveIdx}-chip-${chipIdx}`}
+                                                style={[styles.numberChip, { borderColor: playColor, backgroundColor: `${playColor}20` }]}
+                                              >
+                                                <Text style={styles.numberChipText}>{num}</Text>
+                                              </View>
+                                            ))
+                                          ) : (
+                                            <Text style={styles.jugadaMoveNumbersEmpty}>Sin números</Text>
+                                          )}
+                                        </View>
+
+                                        <Text style={styles.jugadaMoveAmountCol}>${formatAmount(move.totalAmount || 0)}</Text>
+                                        <Text
+                                          style={[
+                                            styles.jugadaMoveProfitCol,
+                                            { color: (move.profit || 0) >= 0 ? '#22c55e' : '#ef4444' },
+                                          ]}
+                                        >
+                                          ${formatAmount(move.profit || 0)}
+                                        </Text>
+                                      </View>
+                                    );
+                                  })}
                               </View>
                               );
                             })}
@@ -868,26 +950,56 @@ const styles = StyleSheet.create({
     fontSize: fontSize.xs,
     fontWeight: fontWeight.bold,
   },
-  jugadaMove: {
+  jugadaMoveRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: spacing.xs,
+    paddingVertical: spacing.xs,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.inputBorder,
+    gap: spacing.sm,
   },
-  jugadaMoveType: {
+  jugadaMoveTypeCol: {
+    minWidth: 70,
     fontSize: fontSize.xs,
     fontWeight: fontWeight.bold,
-    color: '#22c55e',
+    textTransform: 'uppercase',
   },
-  jugadaMoveNumbers: {
+  jugadaMoveNumbersCol: {
+    flex: 1,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.xs,
+    alignItems: 'center',
+  },
+  numberChip: {
+    borderWidth: 1,
+    borderColor: colors.primaryGold,
+    backgroundColor: 'transparent',
+    borderRadius: borderRadius.sm,
+    paddingHorizontal: spacing.xs,
+    paddingVertical: 2,
+  },
+  numberChipText: {
+    fontSize: fontSize.xs,
+    fontWeight: fontWeight.bold,
+    color: colors.lightText,
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+  },
+  jugadaMoveNumbersEmpty: {
     fontSize: fontSize.xs,
     color: colors.subtleGrey,
+    fontStyle: 'italic',
   },
-  jugadaMoveAmount: {
+  jugadaMoveAmountCol: {
+    minWidth: 60,
+    textAlign: 'right',
     fontSize: fontSize.xs,
-    color: colors.subtleGrey,
+    color: '#ef4444',
+    fontWeight: fontWeight.medium,
   },
-  jugadaMoveProfit: {
+  jugadaMoveProfitCol: {
+    minWidth: 60,
+    textAlign: 'right',
     fontSize: fontSize.xs,
     fontWeight: fontWeight.bold,
   },

@@ -1467,13 +1467,15 @@ const RegistrarApuesta: React.FC = () => {
 
                     combinations.forEach(combo => {
                       if (typeof combo === 'string' && combo.includes('X')) {
-                        const [firstStr, secondStr] = combo.split('X');
-                        const first = parseInt((firstStr || '').trim(), 10);
-                        const second = parseInt((secondStr || '').trim(), 10);
+                        const [rawFirst, rawSecond] = combo.split('X');
+                        const first = formatNumberDisplay((rawFirst || '').trim());
+                        const second = formatNumberDisplay((rawSecond || '').trim());
+
                         moveDetails.push({
-                          number: isNaN(first) ? undefined : first,
-                          secondNumber: isNaN(second) ? null : second,
-                          amount: baseAmount
+                          number: first,
+                          secondNumber: second,
+                          amount: baseAmount,
+                          profit: 0,
                         });
                       }
                     });
@@ -1483,11 +1485,14 @@ const RegistrarApuesta: React.FC = () => {
                       const amount = amountLines.length === 1
                         ? (parseFloat(amountLines[0]) || 0)
                         : (parseFloat(amountLines[idx]) || 0);
-                      const num = parseInt((numStr || '').trim(), 10);
+
+                      const formattedNumber = formatNumberDisplay((numStr || '').trim());
+
                       moveDetails.push({
-                        number: isNaN(num) ? undefined : num,
-                        secondNumber: null,
-                        amount: amount
+                        number: formattedNumber,
+                        secondNumber: '',
+                        amount,
+                        profit: 0,
                       });
                     });
                   }
