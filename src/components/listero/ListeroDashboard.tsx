@@ -20,7 +20,7 @@ const ListeroDashboard: React.FC = () => {
 
   const tabs: Array<{ key: TabKey; title: string; icon: keyof typeof Ionicons.glyphMap }> = [
     { key: 'managePlayers', title: 'Jugadores', icon: 'person-add-outline' },
-    { key: 'placeBet', title: 'Apostar', icon: 'flash-outline' },
+    { key: 'placeBet', title: 'Registrar Apuesta', icon: 'flash-outline' },
     { key: 'validateBets', title: 'Validar', icon: 'checkmark-circle-outline' },
     { key: 'history', title: 'Historial', icon: 'time-outline' },
   ];
@@ -44,31 +44,37 @@ const ListeroDashboard: React.FC = () => {
     <View style={styles.container}>
       {/* Tabs */}
       <View style={styles.tabsContainer}>
-        {tabs.map((tab) => (
-          <TouchableOpacity
-            key={tab.key}
-            style={[
-              styles.tab,
-              activeTab === tab.key && styles.tabActive,
-            ]}
-            onPress={() => setActiveTab(tab.key)}
-          >
-            <Ionicons
-              name={tab.icon}
-              size={16}
-              color={activeTab === tab.key ? colors.darkBackground : colors.subtleGrey}
-            />
-            <Text
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.tabsContent}
+        >
+          {tabs.map((tab) => (
+            <TouchableOpacity
+              key={tab.key}
               style={[
-                styles.tabText,
-                activeTab === tab.key && styles.tabTextActive,
+                styles.tab,
+                activeTab === tab.key && styles.tabActive,
               ]}
-              numberOfLines={1}
+              onPress={() => setActiveTab(tab.key)}
             >
-              {tab.title}
-            </Text>
-          </TouchableOpacity>
-        ))}
+              <Ionicons
+                name={tab.icon}
+                size={16}
+                color={activeTab === tab.key ? colors.darkBackground : colors.subtleGrey}
+              />
+              <Text
+                style={[
+                  styles.tabText,
+                  activeTab === tab.key && styles.tabTextActive,
+                ]}
+                numberOfLines={1}
+              >
+                {tab.title}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
       </View>
 
       {/* Content */}
@@ -84,22 +90,21 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   tabsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
     backgroundColor: colors.inputBackground,
     borderRadius: borderRadius.md,
     margin: spacing.sm,
     padding: spacing.xs,
-    gap: spacing.xs,
     borderWidth: 1,
     borderColor: colors.inputBorder,
+  },
+  tabsContent: {
+    gap: spacing.xs,
+    paddingHorizontal: spacing.xs,
   },
   tab: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,
-    flex: 1,
-    minWidth: '45%',
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     borderRadius: borderRadius.sm,
