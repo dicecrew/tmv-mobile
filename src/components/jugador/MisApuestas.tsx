@@ -9,6 +9,7 @@ import {
   Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { colors, spacing, borderRadius, fontSize, fontWeight } from '../../styles/GlobalStyles';
 import Card from '../common/Card';
 import DateRangePicker from '../common/DateRangePicker';
@@ -64,6 +65,7 @@ const MisApuestas: React.FC = () => {
   const [showHistory, setShowHistory] = useState(false);
   const [bets, setBets] = useState<Bet[]>([]);
   const [expandedDate, setExpandedDate] = useState<string | null>(null);
+  const [expandedBets, setExpandedBets] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
 
@@ -319,19 +321,32 @@ const MisApuestas: React.FC = () => {
     return amount.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
   };
 
-  const getPlayTypeColor = (playTypeName: string): string => {
-    switch (playTypeName?.toLowerCase()) {
-      case 'fijo':
-        return '#2563eb';
-      case 'corrido':
-        return '#16a34a';
-      case 'centena':
-        return '#7c3aed';
-      case 'parlet':
-        return '#dc2626';
+  const getBetTypeColor = (playTypeName: string): string => {
+    switch (playTypeName?.toUpperCase()) {
+      case 'FIJO':
+        return '#2563eb'; // Azul
+      case 'CORRIDO':
+        return '#16a34a'; // Verde
+      case 'CENTENA':
+        return '#7c3aed'; // Morado
+      case 'PARLET':
+        return '#dc2626'; // Rojo
       default:
         return colors.primaryGold;
     }
+  };
+
+  // Alternar expansión de apuesta
+  const toggleExpandBet = (betId: string) => {
+    setExpandedBets((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(betId)) {
+        newSet.delete(betId);
+      } else {
+        newSet.add(betId);
+      }
+      return newSet;
+    });
   };
 
   const getMoveNumberList = (betPlayName: string, move: Move): string[] => {
@@ -374,6 +389,7 @@ const MisApuestas: React.FC = () => {
     setShowHistory(false);
     setBets([]);
     setExpandedDate(null);
+    setExpandedBets(new Set());
   };
     
     // Calcular resúmenes generales
@@ -428,14 +444,21 @@ const MisApuestas: React.FC = () => {
               onPress={loadUserBets}
               disabled={isLoading}
             >
-              {isLoading ? (
-                <ActivityIndicator size="small" color={colors.darkBackground} />
-              ) : (
-                <>
-                  <Ionicons name="search-outline" size={20} color={colors.darkBackground} />
-                  <Text style={styles.searchButtonText}>Buscar Historial</Text>
-                </>
-              )}
+              <LinearGradient
+                colors={[colors.primaryGold, colors.primaryRed]}
+                style={styles.searchButtonGradient}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+              >
+                {isLoading ? (
+                  <ActivityIndicator size="small" color={colors.darkBackground} />
+                ) : (
+                  <>
+                    <Ionicons name="search-outline" size={20} color={colors.darkBackground} />
+                    <Text style={styles.searchButtonText}>Buscar Historial</Text>
+                  </>
+                )}
+              </LinearGradient>
             </TouchableOpacity>
           </View>
         )}
@@ -487,145 +510,156 @@ const MisApuestas: React.FC = () => {
   return (
                 <View key={dateKey}>
                   {/* Agrupación por Fecha */}
-                  <View style={styles.dateGroupHeader}>
-                    <View style={styles.dateGroupButton}>
-                      <Ionicons name="calendar-outline" size={20} color={colors.darkBackground} />
-                      <Text style={styles.dateGroupText}>{formatDate(dateKey)}</Text>
-                    </View>
-                    <Text style={styles.dateGroupCount}>
-                      {summary.totalBets} jugada{summary.totalBets !== 1 ? 's' : ''}
-                    </Text>
-                    <TouchableOpacity 
-                      style={styles.hideButton}
-                      onPress={() => setExpandedDate(isExpanded ? null : dateKey)}
-                    >
+                  <TouchableOpacity
+                    style={styles.dateGroupHeader}
+                    onPress={() => setExpandedDate(isExpanded ? null : dateKey)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.dateGroupContent}>
+                      <View style={styles.dateGroupLeft}>
+                        <View style={styles.dateIconCircle}>
+                          <Ionicons name="calendar" size={18} color={colors.primaryGold} />
+                        </View>
+                        <View style={styles.dateGroupInfo}>
+                          <Text style={styles.dateGroupText}>{formatDate(dateKey)}</Text>
+                          <Text style={styles.dateGroupCount}>
+                            {summary.totalBets} jugada{summary.totalBets !== 1 ? 's' : ''} • ${formatAmount(summary.totalAmount)}
+                          </Text>
+                        </View>
+                      </View>
                       <Ionicons 
-                        name={isExpanded ? 'chevron-up' : 'chevron-down'} 
-                        size={20} 
-                        color={colors.darkBackground} 
+                        name={isExpanded ? 'chevron-up-circle' : 'chevron-down-circle'} 
+                        size={24} 
+                        color={colors.primaryGold} 
                       />
-                    </TouchableOpacity>
-                  </View>
+                    </View>
+                  </TouchableOpacity>
 
                   {/* Detalles de Apuestas */}
                     {isExpanded && (
                     <View style={styles.betsContainer}>
-                        {dateBets.map((bet) => (
+                        {dateBets.map((bet) => {
+                          const isBetExpanded = expandedBets.has(bet.id);
+                          const totalAmount = bet.betPlays?.reduce((total, play) => 
+                            total + (play.moves?.reduce((moveTotal, move) => moveTotal + (move.totalAmount || 0), 0) || 0), 0) || 0;
+                          const totalProfit = bet.betPlays?.reduce((total, play) => 
+                            total + (play.moves?.reduce((moveTotal, move) => moveTotal + (move.profit || 0), 0) || 0), 0) || 0;
+
+                          return (
                         <View key={bet.id} style={styles.betCard}>
                           {/* Header de la Apuesta */}
                           <View style={styles.betCardHeader}>
-                            <View style={styles.betCardHeaderLeft}>
-                              <Ionicons name="business-outline" size={16} color={colors.lightText} />
-                              <Text style={styles.betCardTitle}>
-                                {bet.lotteryName} • {bet.throwName}
+                            {/* Primera línea: Lotería y Estado */}
+                            <View style={styles.betCardFirstRow}>
+                              <View style={styles.betCardTitleRow}>
+                                <Ionicons name="business-outline" size={14} color={colors.lightText} />
+                                <Text style={styles.betCardTitle}>
+                                  {bet.lotteryName} • {bet.throwName}
+                                </Text>
+                              </View>
+                              <View
+                                style={[
+                                  styles.betCardStatus,
+                                  { backgroundColor: getStatusColor(bet.stateCode) }
+                                ]}
+                              >
+                                <Text style={styles.betCardStatusText}>
+                                  {getStatusIcon(bet.stateCode)} {getBetStatus(bet)}
+                                </Text>
+                              </View>
+                            </View>
+
+                            {/* Segunda línea: Fecha y botón expandir */}
+                            <TouchableOpacity
+                              style={styles.betCardSecondRow}
+                              onPress={() => toggleExpandBet(bet.id)}
+                              activeOpacity={0.7}
+                            >
+                              <Text style={styles.betCardDate}>
+                                📅 {formatShortDate(bet.date)} • {new Date(bet.date).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', hour12: true })}
                               </Text>
-                            </View>
-                            <View style={styles.betCardStatus}>
-                              <Ionicons name="help-circle-outline" size={16} color={colors.lightText} />
-                              <Text style={styles.betCardStatusText}>{getBetStatus(bet)}</Text>
-                            </View>
+                              <Ionicons
+                                name={isBetExpanded ? 'chevron-up-circle' : 'chevron-down-circle'}
+                                size={18}
+                                color={colors.primaryGold}
+                              />
+                            </TouchableOpacity>
                           </View>
 
-                          {/* Estado y Fechas */}
-                          <View style={styles.betCardInfo}>
-                            <View style={styles.betCardStatusBadge}>
-                              <Text style={styles.betCardStatusBadgeText}>Sin resultados</Text>
-                            </View>
-                            <Text style={styles.betCardDate}>
-                              Fecha: {formatShortDate(bet.date)} {new Date(bet.date).toLocaleTimeString('es-ES')}
-            </Text>
-                            <View style={styles.betCardThrowStatus}>
-                              <Text style={styles.betCardThrowStatusLabel}>Estado Tirada:</Text>
-                              <Ionicons name="hourglass-outline" size={16} color={colors.primaryGold} />
-                              <Text style={styles.betCardThrowStatusText}>Pendiente</Text>
-                              </View>
-          </View>
-          
-                          {/* Sección JUGADAS */}
-                          <View style={styles.jugadasSection}>
-                            <View style={styles.jugadasHeader}>
-                              <Ionicons name="dice-outline" size={16} color={colors.subtleGrey} />
-                              <Text style={styles.jugadasTitle}>JUGADAS</Text>
-                            </View>
-
-                            {bet.betPlays?.map((betPlay, idx) => {
-                              const playTotal = betPlay.moves?.reduce((total, move) => total + (move.totalAmount || 0), 0) || 0;
-                              const playProfit = betPlay.moves?.reduce((total, move) => total + (move.profit || 0), 0) || 0;
-                              
-                              return (
-                                <View key={idx} style={styles.jugadaItem}>
-                                  <View style={styles.jugadaHeader}>
-                                    <Text style={styles.jugadaType}>{betPlay.playTypeName}</Text>
-                                    <Text style={styles.jugadaTotal}>Total: ${formatAmount(playTotal)}</Text>
-                                    <Text style={[styles.jugadaProfit, { color: playProfit >= 0 ? '#22c55e' : '#ef4444' }]}>
-                                      Ganancia: ${formatAmount(playProfit)}
-                                    </Text>
-                                  </View>
-                                  
-                                  {betPlay.moves?.map((move, moveIdx) => {
-                                    const movePlayTypeName = move.playTypeName || betPlay.playTypeName;
-                                    const playColor = getPlayTypeColor(movePlayTypeName || '');
-                                    const numbersList = getMoveNumberList(movePlayTypeName || '', move);
-
-                                    return (
-                                      <View key={moveIdx} style={styles.jugadaMoveRow}>
-                                        <Text style={[styles.jugadaMoveTypeCol, { color: playColor }]}>
-                                          {movePlayTypeName}
-                                        </Text>
-
-                                        <View style={styles.jugadaMoveNumbersCol}>
-                                          {numbersList.length > 0 ? (
-                                            numbersList.map((num, chipIdx) => (
-                                              <View
-                                                key={`${moveIdx}-chip-${chipIdx}`}
-                                                style={[styles.numberChip, { borderColor: playColor, backgroundColor: `${playColor}20` }]}
-                                              >
-                                                <Text style={styles.numberChipText}>{num}</Text>
+                          {/* Detalle de números - Solo visible si está expandido */}
+                          {isBetExpanded && (
+                            <View style={styles.betCardDetails}>
+                              <View style={styles.allNumbersContainer}>
+                                {bet.betPlays?.map((betPlay, betPlayIdx) => (
+                                  <React.Fragment key={betPlayIdx}>
+                                    {(betPlay.moves || []).map((move, moveIdx) => (
+                                      <React.Fragment key={`${betPlayIdx}-${moveIdx}`}>
+                                        {(move.moveDetails || []).map((detail, detailIdx) => {
+                                          const playType = move.playTypeName || betPlay.playTypeName || 'JUGADA';
+                                          const isParlet = playType.toUpperCase() === 'PARLET';
+                                          const numberDisplay = detail.secondNumber 
+                                            ? (isParlet ? `${detail.number}x${detail.secondNumber}` : `${detail.number} - ${detail.secondNumber}`)
+                                            : detail.number;
+                                          
+                                          return (
+                                            <View key={`${betPlayIdx}-${moveIdx}-${detailIdx}`} style={styles.numberRow}>
+                                              <View style={styles.numberInfo}>
+                                                <View
+                                                  style={[
+                                                    styles.miniTypeBadge,
+                                                    { backgroundColor: getBetTypeColor(playType) },
+                                                  ]}
+                                                >
+                                                  <Text style={styles.miniTypeText}>{playType}</Text>
+                                                </View>
+                                                <Text style={styles.numberText}>
+                                                  🎲 {numberDisplay}
+                                                </Text>
                                               </View>
-                                            ))
-                                          ) : (
-                                            <Text style={styles.jugadaMoveNumbersEmpty}>Sin números</Text>
-                                          )}
-                                        </View>
-
-                                        <Text style={styles.jugadaMoveAmountCol}>${formatAmount(move.totalAmount || 0)}</Text>
-                                        <Text
-                                          style={[
-                                            styles.jugadaMoveProfitCol,
-                                            { color: (move.profit || 0) >= 0 ? '#22c55e' : '#ef4444' },
-                                          ]}
-                                        >
-                                          ${formatAmount(move.profit || 0)}
-                                        </Text>
-                                      </View>
-                                    );
-                                  })}
+                                              <View style={styles.amountInfo}>
+                                                <Text style={styles.numberAmount}>${formatAmount(detail.amount)}</Text>
+                                                {detail.profit !== undefined && detail.profit !== 0 && (
+                                                  <Text
+                                                    style={[
+                                                      styles.numberProfit,
+                                                      detail.profit > 0 ? styles.profitPositive : styles.profitNegative,
+                                                    ]}
+                                                  >
+                                                    {detail.profit > 0 ? '+' : ''}{formatAmount(detail.profit)}
+                                                  </Text>
+                                                )}
+                                              </View>
+                                            </View>
+                                          );
+                                        })}
+                                      </React.Fragment>
+                                    ))}
+                                  </React.Fragment>
+                                ))}
                               </View>
-                              );
-                            })}
-                          </View>
 
-                          {/* Resumen de Apuesta */}
-                          <View style={styles.betSummary}>
-                            <View style={styles.betSummaryLeft}>
-                              <Ionicons name="wallet-outline" size={20} color={colors.darkBackground} />
-                              <Text style={styles.betSummaryLabel}>APOSTADO</Text>
-                              <Text style={styles.betSummaryAmount}>
-                                ${formatAmount(bet.betPlays?.reduce((total, play) => 
-                                  total + (play.moves?.reduce((moveTotal, move) => moveTotal + (move.totalAmount || 0), 0) || 0), 0) || 0)}
-                              </Text>
+                              {/* Resumen de Apuesta */}
+                              <View style={styles.betSummary}>
+                                <View style={styles.betSummaryLeft}>
+                                  <Ionicons name="wallet-outline" size={20} color={colors.darkBackground} />
+                                  <Text style={styles.betSummaryLabel}>APOSTADO</Text>
+                                  <Text style={styles.betSummaryAmount}>
+                                    ${formatAmount(totalAmount)}
+                                  </Text>
+                                </View>
+                                <View style={styles.betSummaryRight}>
+                                  <Ionicons name="trophy-outline" size={20} color={colors.darkBackground} />
+                                  <Text style={styles.betSummaryLabel}>PREMIO</Text>
+                                  <Text style={styles.betSummaryAmount}>
+                                    ${formatAmount(totalProfit)}
+                                  </Text>
+                                </View>
+                              </View>
                             </View>
-                            <View style={styles.betSummaryRight}>
-                              <Ionicons name="trophy-outline" size={20} color={colors.darkBackground} />
-                              <Text style={styles.betSummaryLabel}>PREMIO</Text>
-                              <Text style={styles.betSummaryAmount}>
-                                ${formatAmount(bet.betPlays?.reduce((total, play) => 
-                                  total + (play.moves?.reduce((moveTotal, move) => moveTotal + (move.profit || 0), 0) || 0), 0) || 0)}
-                              </Text>
-                            </View>
+                          )}
                           </View>
-                          </View>
-                        ))}
+                        );
+                        })}
                       </View>
                     )}
                   </View>
@@ -726,13 +760,15 @@ const styles = StyleSheet.create({
     borderColor: colors.inputBorder,
   },
   searchButton: {
+    borderRadius: borderRadius.md,
+    overflow: 'hidden',
+  },
+  searchButtonGradient: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: spacing.sm,
-    backgroundColor: colors.primaryGold,
     paddingVertical: spacing.lg,
-    borderRadius: borderRadius.md,
   },
   searchButtonText: {
     fontSize: fontSize.lg,
@@ -793,215 +829,171 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   dateGroupHeader: {
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.md,
+    backgroundColor: colors.darkBackground,
+    borderRadius: borderRadius.md,
+    borderWidth: 2,
+    borderColor: colors.inputBorder,
+    borderLeftWidth: 4,
+    borderLeftColor: colors.primaryGold,
+    overflow: 'hidden',
+    shadowColor: colors.primaryGold,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  dateGroupContent: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    marginBottom: spacing.sm,
+    padding: spacing.md,
   },
-  dateGroupButton: {
+  dateGroupLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    backgroundColor: '#fbbf24',
-    borderRadius: borderRadius.md,
+    flex: 1,
+  },
+  dateIconCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.inputBackground,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: colors.primaryGold,
+  },
+  dateGroupInfo: {
+    flex: 1,
   },
   dateGroupText: {
-    fontSize: fontSize.sm,
+    fontSize: fontSize.md,
     fontWeight: fontWeight.bold,
-    color: colors.darkBackground,
+    color: colors.lightText,
+    marginBottom: 2,
   },
   dateGroupCount: {
-    fontSize: fontSize.sm,
+    fontSize: fontSize.xs,
     color: colors.subtleGrey,
-  },
-  hideButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    backgroundColor: '#fbbf24',
-    borderRadius: borderRadius.md,
-  },
-  hideButtonText: {
-    fontSize: fontSize.sm,
-    fontWeight: fontWeight.bold,
-    color: colors.darkBackground,
+    fontWeight: fontWeight.medium,
   },
   betsContainer: {
     paddingHorizontal: spacing.lg,
     marginBottom: spacing.lg,
   },
   betCard: {
-    backgroundColor: colors.inputBackground,
+    backgroundColor: colors.darkBackground,
     borderRadius: borderRadius.md,
-    padding: spacing.md,
     marginBottom: spacing.md,
-    borderWidth: 1,
+    borderWidth: 2,
     borderColor: colors.inputBorder,
+    borderLeftWidth: 4,
+    borderLeftColor: colors.primaryGold,
+    overflow: 'hidden',
   },
   betCardHeader: {
+    padding: spacing.md,
+    gap: spacing.xs,
+  },
+  betCardFirstRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: spacing.sm,
   },
-  betCardHeaderLeft: {
+  betCardSecondRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingTop: spacing.xs,
+  },
+  betCardTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,
-    flex: 1,
   },
   betCardTitle: {
     fontSize: fontSize.sm,
-    fontWeight: fontWeight.medium,
+    fontWeight: fontWeight.bold,
     color: colors.lightText,
   },
   betCardStatus: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
-    backgroundColor: colors.darkBackground,
     borderRadius: borderRadius.sm,
   },
   betCardStatusText: {
     fontSize: fontSize.xs,
-    color: colors.lightText,
-  },
-  betCardInfo: {
-    marginBottom: spacing.sm,
-  },
-  betCardStatusBadge: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    backgroundColor: '#fbbf24',
-    borderRadius: borderRadius.sm,
-    marginBottom: spacing.xs,
-  },
-  betCardStatusBadgeText: {
-    fontSize: fontSize.xs,
     fontWeight: fontWeight.bold,
-    color: colors.darkBackground,
+    color: 'white',
+  },
+  betCardDetails: {
+    backgroundColor: colors.inputBackground,
+    padding: spacing.md,
   },
   betCardDate: {
-    fontSize: fontSize.xs,
+    fontSize: 11,
     color: colors.subtleGrey,
-    marginBottom: spacing.xs,
+    flex: 1,
   },
-  betCardCloseTime: {
-    fontSize: fontSize.xs,
-    color: colors.subtleGrey,
-    marginBottom: spacing.xs,
-  },
-  betCardThrowStatus: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  allNumbersContainer: {
     gap: spacing.xs,
-  },
-  betCardThrowStatusLabel: {
-    fontSize: fontSize.xs,
-    color: colors.subtleGrey,
-  },
-  betCardThrowStatusText: {
-    fontSize: fontSize.xs,
-    fontWeight: fontWeight.bold,
-    color: colors.primaryGold,
-  },
-  jugadasSection: {
     marginBottom: spacing.md,
   },
-  jugadasHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    marginBottom: spacing.sm,
-  },
-  jugadasTitle: {
-    fontSize: fontSize.sm,
-    fontWeight: fontWeight.bold,
-    color: colors.subtleGrey,
-  },
-  jugadaItem: {
-    marginBottom: spacing.sm,
-  },
-  jugadaHeader: {
+  numberRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: spacing.xs,
+    backgroundColor: colors.darkBackground,
+    padding: spacing.sm,
+    borderRadius: borderRadius.sm,
+    borderWidth: 1,
+    borderColor: colors.inputBorder,
   },
-  jugadaType: {
-    fontSize: fontSize.sm,
-    fontWeight: fontWeight.bold,
-    color: '#22c55e',
-  },
-  jugadaTotal: {
-    fontSize: fontSize.xs,
-    color: colors.subtleGrey,
-  },
-  jugadaProfit: {
-    fontSize: fontSize.xs,
-    fontWeight: fontWeight.bold,
-  },
-  jugadaMoveRow: {
+  numberInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: spacing.xs,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.inputBorder,
     gap: spacing.sm,
+    flex: 1,
   },
-  jugadaMoveTypeCol: {
-    minWidth: 70,
+  miniTypeBadge: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 3,
+    borderRadius: borderRadius.sm,
+  },
+  miniTypeText: {
     fontSize: fontSize.xs,
     fontWeight: fontWeight.bold,
+    color: 'white',
     textTransform: 'uppercase',
   },
-  jugadaMoveNumbersCol: {
-    flex: 1,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.xs,
-    alignItems: 'center',
-  },
-  numberChip: {
-    borderWidth: 1,
-    borderColor: colors.primaryGold,
-    backgroundColor: 'transparent',
-    borderRadius: borderRadius.sm,
-    paddingHorizontal: spacing.xs,
-    paddingVertical: 2,
-  },
-  numberChipText: {
-    fontSize: fontSize.xs,
-    fontWeight: fontWeight.bold,
+  numberText: {
+    fontSize: fontSize.sm,
     color: colors.lightText,
+    fontWeight: fontWeight.semibold,
     fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
   },
-  jugadaMoveNumbersEmpty: {
-    fontSize: fontSize.xs,
-    color: colors.subtleGrey,
-    fontStyle: 'italic',
+  amountInfo: {
+    alignItems: 'flex-end',
+    gap: 2,
   },
-  jugadaMoveAmountCol: {
-    minWidth: 60,
-    textAlign: 'right',
-    fontSize: fontSize.xs,
-    color: '#ef4444',
-    fontWeight: fontWeight.medium,
-  },
-  jugadaMoveProfitCol: {
-    minWidth: 60,
-    textAlign: 'right',
-    fontSize: fontSize.xs,
+  numberAmount: {
+    fontSize: fontSize.md,
     fontWeight: fontWeight.bold,
+    color: colors.primaryGold,
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+  },
+  numberProfit: {
+    fontSize: fontSize.xs,
+    fontWeight: fontWeight.semibold,
+  },
+  profitPositive: {
+    color: '#22c55e',
+  },
+  profitNegative: {
+    color: '#ef4444',
   },
   dateCard: {
     backgroundColor: colors.darkBackground,
