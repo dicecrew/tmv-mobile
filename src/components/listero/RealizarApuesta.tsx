@@ -537,7 +537,7 @@ const PlayerBetForm: React.FC<PlayerBetFormProps> = ({ player, onBack, bookieId 
   const [isLoadingThrows, setIsLoadingThrows] = useState(false);
   const [isLoadingPlayTypes, setIsLoadingPlayTypes] = useState(false);
   const [isSending, setIsSending] = useState(false);
-  const [isFloatingModalVisible, setIsFloatingModalVisible] = useState(true);
+  const [isFloatingModalVisible, setIsFloatingModalVisible] = useState(false);
 
   const [currentTime, setCurrentTime] = useState(new Date());
 
@@ -2271,6 +2271,7 @@ const formStyles = StyleSheet.create({
   mainContainer: {
     flex: 1,
     position: 'relative',
+    zIndex: 1,
   },
   container: {
     flex: 1,

@@ -1,10 +1,9 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
-  Modal,
   Animated,
   Easing,
   Dimensions,
@@ -78,6 +77,7 @@ const FloatingKeyboardModal: React.FC<FloatingKeyboardModalProps> = ({
   calculateCurrentAmount,
 }) => {
   const screenHeight = Dimensions.get('screen').height;
+  const sheetHeight = screenHeight * 0.5;
 
   return (
     <>
@@ -88,25 +88,25 @@ const FloatingKeyboardModal: React.FC<FloatingKeyboardModalProps> = ({
             style={[
               styles.showModalButton,
               { top: screenHeight * 0.70 },
-              isVisible ? { opacity: 0 } : { opacity: 1 }
             ]}
             onPress={onToggle}
-            accessibilityLabel="Abrir panel"
-            disabled={isVisible}
+            accessibilityLabel={isVisible ? "Cerrar panel" : "Abrir panel"}
+            disabled={false}
           >
-            <Ionicons name="chevron-back-outline" size={22} color="white" />
+            <Ionicons 
+              name={isVisible ? "chevron-forward-outline" : "chevron-back-outline"} 
+              size={22} 
+              color="white" 
+            />
           </TouchableOpacity>
         </View>
       </Portal>
 
-      {/* Modal Flotante con Botones (bottom sheet) */}
+      {/* Sheet flotante no bloqueante */}
       {isVisible && (
-        <Modal visible transparent presentationStyle="overFullScreen" animationType="none" statusBarTranslucent>
-          <View style={styles.sheetOverlay} pointerEvents="box-none">
-            {/* Estado local para cerrar con animación antes de desmontar */}
-            <SheetWithClose onToggle={onToggle} topOffset={screenHeight * 0.70}>
-              {/* Contenido del sheet */}
-              <View style={{ flex: 1 }} pointerEvents="auto">
+        <Portal>
+          <SheetWithClose onToggle={onToggle} sheetHeight={sheetHeight}>
+            <View style={styles.sheetInner} pointerEvents="auto">
             {/* Botones de Tipos de Juego */}
             <View style={styles.floatingTypesGrid} pointerEvents="auto">
               {playTypes.map(type => {
@@ -242,11 +242,9 @@ const FloatingKeyboardModal: React.FC<FloatingKeyboardModalProps> = ({
               </TouchableOpacity>
             </View>
 
-                {/* (opcional: botón interno) */}
-              </View>
-            </SheetWithClose>
-          </View>
-        </Modal>
+            </View>
+          </SheetWithClose>
+        </Portal>
       )}
     </>
   );
@@ -254,18 +252,24 @@ const FloatingKeyboardModal: React.FC<FloatingKeyboardModalProps> = ({
 
 const styles = StyleSheet.create({
   sheetOverlay: {
-    flex: 1,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     justifyContent: 'flex-end',
     alignItems: 'center',
     backgroundColor: 'transparent',
-    position: 'relative',
+    zIndex: 10000,
   },
   sheetContent: {
-    height: '45%',
+    position: 'absolute',
+    left: 0,
+    right: 0,
     width: '100%',
     backgroundColor: 'transparent',
     paddingTop: spacing.sm,
-    paddingBottom: spacing.xl,
+    paddingBottom: spacing.sm,
     paddingHorizontal: spacing.md,
   },
   floatingTypesGrid: {
@@ -370,7 +374,7 @@ const styles = StyleSheet.create({
   floatingBottomButtons: {
     flexDirection: 'row',
     gap: spacing.xs,
-    marginBottom: spacing.sm,
+    marginBottom: spacing.xs,
     backgroundColor: colors.darkBackground,
     padding: spacing.sm,
     borderRadius: borderRadius.md,
@@ -386,11 +390,11 @@ const styles = StyleSheet.create({
   floatingActionButton: {
     flex: 1,
     borderRadius: borderRadius.sm,
-    paddingVertical: spacing.sm,
+    paddingVertical: spacing.xs,
     paddingHorizontal: spacing.sm,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 40,
+    minHeight: 36,
   },
   floatingCopyButton: {
     backgroundColor: colors.primaryGold,
@@ -412,26 +416,8 @@ const styles = StyleSheet.create({
     fontWeight: fontWeight.bold,
     color: 'white',
   },
-  floatingToggleButton: {
-    position: 'absolute',
-    top: -15,
-    right: 20,
-    backgroundColor: colors.darkBackground,
-    borderWidth: 2,
-    borderColor: colors.primaryGold,
-    borderRadius: 15,
-    width: 30,
-    height: 30,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
+  sheetInner: {
+    flex: 1,
   },
   buttonOverlay: {
     position: 'absolute',
@@ -467,76 +453,61 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: colors.primaryGold,
   },
-  sideToggleButton: {
-    position: 'absolute',
-    right: 0,
-    top: '70%',
-    backgroundColor: colors.primaryGold,
-    borderTopLeftRadius: 24,
-    borderBottomLeftRadius: 24,
-    borderTopRightRadius: 0,
-    borderBottomRightRadius: 0,
-    width: 42,
-    height: 80,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 20,
-    borderWidth: 2,
-    borderColor: colors.primaryGold,
-    zIndex: 1001,
-  },
 });
 
 export default FloatingKeyboardModal;
 
 
-// Wrapper que maneja apertura y cierre animados desde la derecha
-const SheetWithClose: React.FC<{ onToggle: () => void; topOffset: number; children: React.ReactNode }> = ({ onToggle, topOffset, children }) => {
-  const translateX = useRef(new Animated.Value(400)).current;
-  const [closing, setClosing] = useState(false);
+// Wrapper que maneja apertura y cierre animados desde la mitad de la pantalla
+const SheetWithClose: React.FC<{ onToggle: () => void; sheetHeight: number; children: React.ReactNode }> = ({ onToggle, sheetHeight, children }) => {
+  const screenHeight = Dimensions.get('screen').height;
+  const initialPosition = screenHeight * 0.5;
+  // El translateY debe animar desde (screenHeight - initialPosition) hasta 0
+  // para que cuando se sume con top: initialPosition, el modal esté en la posición correcta
+  const translateY = useRef(new Animated.Value(screenHeight - initialPosition)).current;
+  const closingRef = useRef(false);
 
   useEffect(() => {
-    // Animación de entrada
-    Animated.timing(translateX, {
+    Animated.timing(translateY, {
       toValue: 0,
-      duration: 250,
+      duration: 260,
       easing: Easing.out(Easing.cubic),
       useNativeDriver: true,
     }).start();
-  }, []);
+  }, [translateY]);
 
-  const handleRequestClose = () => {
-    if (closing) return;
-    setClosing(true);
-    Animated.timing(translateX, {
-      toValue: 400,
+  const handleClose = () => {
+    if (closingRef.current) return;
+    closingRef.current = true;
+    Animated.timing(translateY, {
+      toValue: screenHeight - initialPosition,
       duration: 220,
       easing: Easing.in(Easing.cubic),
       useNativeDriver: true,
     }).start(({ finished }) => {
       if (finished) {
         onToggle();
+      } else {
+        closingRef.current = false;
       }
     });
   };
 
   return (
-    <>
-      {/* Handle lateral para cerrar */}
-      <TouchableOpacity style={[styles.sideToggleButton, { top: topOffset }]} onPress={handleRequestClose} accessibilityLabel="Cerrar panel">
-        <Ionicons name="chevron-forward-outline" size={22} color="white" />
-      </TouchableOpacity>
-
-      <Animated.View style={[styles.sheetContent, { transform: [{ translateX }] }]}> 
-        {children}
+    <View style={styles.sheetOverlay} pointerEvents="box-none">
+      <Animated.View
+        style={[
+          styles.sheetContent,
+          {
+            height: sheetHeight,
+            top: initialPosition,
+            transform: [{ translateY }],
+          },
+        ]}
+        pointerEvents="auto"
+      >
+        <View style={styles.sheetInner}>{children}</View>
       </Animated.View>
-    </>
+    </View>
   );
 };
