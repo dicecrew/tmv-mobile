@@ -63,6 +63,7 @@ const ValidacionApuestas: React.FC = () => {
   const [expandedBets, setExpandedBets] = useState<Set<string>>(new Set());
   const [validatedBets, setValidatedBets] = useState<Set<string>>(new Set());
   const [validatingBets, setValidatingBets] = useState<Set<string>>(new Set());
+  const [isValidatingAll, setIsValidatingAll] = useState(false);
 
   // Cargar estados
   const loadStates = async () => {
@@ -219,6 +220,89 @@ const ValidacionApuestas: React.FC = () => {
     );
   };
 
+  // Validar todas las apuestas
+  const handleValidateAllBets = () => {
+    const approvedState = states.find((s) => s.code === 'Approved');
+    if (!approvedState) {
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'No se pudo obtener el estado "Approved"',
+        position: 'top',
+        topOffset: 60,
+      });
+      return;
+    }
+
+    if (filteredBets.length === 0) {
+      Toast.show({
+        type: 'info',
+        text1: 'Sin apuestas',
+        text2: 'No hay apuestas para validar',
+        position: 'top',
+        topOffset: 60,
+      });
+      return;
+    }
+
+    const totalAllBets = filteredBets.reduce((sum, bet) => {
+      return sum + getTotalAmount(bet.betPlays || bet.jugadas || []);
+    }, 0);
+
+    Alert.alert(
+      '🎯 Validar Todas las Apuestas',
+      `¿Estás seguro de que quieres validar TODAS las apuestas?\n\n${filteredBets.length} apuesta${filteredBets.length !== 1 ? 's' : ''}\nMonto Total: $${formatAmount(totalAllBets)}`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Validar Todas',
+          style: 'destructive',
+          onPress: async () => {
+            setIsValidatingAll(true);
+            let successCount = 0;
+            let errorCount = 0;
+
+            for (const bet of filteredBets) {
+              try {
+                await bookieService.updateBetState(bet.id, approvedState.id);
+                setValidatedBets((prev) => new Set([...prev, bet.id]));
+                successCount++;
+              } catch (error: any) {
+                errorCount++;
+                console.error(`Error validating bet ${bet.id}:`, error);
+              }
+            }
+
+            setIsValidatingAll(false);
+
+            if (successCount > 0) {
+              Toast.show({
+                type: 'success',
+                text1: '¡Validación Completada!',
+                text2: `${successCount} apuesta${successCount !== 1 ? 's' : ''} validada${successCount !== 1 ? 's' : ''}${errorCount > 0 ? ` - ${errorCount} error${errorCount !== 1 ? 'es' : ''}` : ''}`,
+                position: 'top',
+                topOffset: 60,
+                visibilityTime: 6000,
+              });
+            }
+
+            if (errorCount > 0 && successCount === 0) {
+              Toast.show({
+                type: 'error',
+                text1: 'Error',
+                text2: 'No se pudo validar ninguna apuesta',
+                position: 'top',
+                topOffset: 60,
+              });
+            }
+
+            loadBets();
+          },
+        },
+      ]
+    );
+  };
+
   // Alternar expansión
   const toggleExpandBet = (betId: string) => {
     setExpandedBets((prev) => {
@@ -343,7 +427,7 @@ const ValidacionApuestas: React.FC = () => {
 
           <TouchableOpacity style={styles.applyButton} onPress={loadBets} disabled={isLoading}>
             <LinearGradient
-              colors={['#22c55e', '#16a34a']}
+              colors={['#f59e0b', '#d97706']}
               style={styles.applyButtonGradient}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
@@ -358,6 +442,36 @@ const ValidacionApuestas: React.FC = () => {
               )}
             </LinearGradient>
           </TouchableOpacity>
+
+          {/* Botón Validar Todas */}
+          {filteredBets.length > 0 && !isLoading && (
+            <TouchableOpacity
+              style={styles.validateAllButton}
+              onPress={handleValidateAllBets}
+              disabled={isValidatingAll}
+            >
+              <LinearGradient
+                colors={['#22c55e', '#16a34a']}
+                style={styles.validateAllButtonGradient}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+              >
+                {isValidatingAll ? (
+                  <>
+                    <ActivityIndicator size="small" color="white" />
+                    <Text style={styles.validateAllButtonText}>Validando...</Text>
+                  </>
+                ) : (
+                  <>
+                    <Ionicons name="checkmark-done-circle" size={20} color="white" />
+                    <Text style={styles.validateAllButtonText}>
+                      Validar Todas ({filteredBets.length})
+                    </Text>
+                  </>
+                )}
+              </LinearGradient>
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* Lista de apuestas */}
@@ -611,6 +725,26 @@ const styles = StyleSheet.create({
   },
   applyButtonText: {
     fontSize: fontSize.sm,
+    fontWeight: fontWeight.bold,
+    color: 'white',
+    flexShrink: 1,
+    textAlign: 'center',
+  },
+  validateAllButton: {
+    borderRadius: borderRadius.sm,
+    overflow: 'hidden',
+    marginTop: spacing.md,
+  },
+  validateAllButtonGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.sm,
+  },
+  validateAllButtonText: {
+    fontSize: fontSize.md,
     fontWeight: fontWeight.bold,
     color: 'white',
     flexShrink: 1,
