@@ -6,7 +6,9 @@
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "screenshots": "./scripts/simple-screenshots.sh",
+    "fix-screenshots": "./scripts/fix-screenshots.sh"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.2",

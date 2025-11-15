@@ -17,7 +17,10 @@ export default {
     ios: {
       supportsTablet: true,
       bundleIdentifier: 'com.tmv.mobile',
-      icon: './assets/icon.png'
+      icon: './assets/icon.png',
+      infoPlist: {
+        ITSAppUsesNonExemptEncryption: false
+      }
     },
     android: {
       adaptiveIcon: {
@@ -31,7 +34,10 @@ export default {
       favicon: './assets/favicon.png'
     },
     extra: {
-      apiUrl: process.env.EXPO_PUBLIC_API_URL || 'https://api.themoneyvice.com'
+      apiUrl: process.env.EXPO_PUBLIC_API_URL || 'https://api.themoneyvice.com',
+      eas: {
+        projectId: '688e34d6-803d-40c9-8787-e90b25d961a5'
+      }
     }
   }
 };
