@@ -305,16 +305,9 @@ const RegistrarApuesta: React.FC = () => {
         throw new Error('ID de lotería inválido');
       }
       
-      // Usar el endpoint correcto del proyecto web: active-for-time
+      // Usar solo el endpoint active-for-time (no hacer fallback a /active)
       const utcTime = new Date().toISOString();
-      
-      let response;
-      try {
-        response = await throwService.getActiveThrowsByLotteryForTime(lotteryId, utcTime);
-      } catch (activeForTimeError) {
-        // Fallback al endpoint active si active-for-time falla
-        response = await throwService.getActiveThrowsByLottery(lotteryId);
-      }
+      const response = await throwService.getActiveThrowsByLotteryForTime(lotteryId, utcTime);
 
       let throwsArray: any[] = [];
       
@@ -392,24 +385,29 @@ const RegistrarApuesta: React.FC = () => {
         });
       }
       
+      // Siempre establecer throws como vacío cuando hay error
       setThrows([]);
       setSelectedThrowId('');
       
-      // Mostrar mensaje de error más específico
-      let errorMessage = 'No se pudieron cargar las tiradas';
+      // Si es 404, tratarlo como "no hay tiradas activas" (no mostrar error)
       if (error.response?.status === 404) {
-        errorMessage = 'No hay tiradas disponibles para esta lotería';
-      } else if (error.response?.status === 401) {
-        errorMessage = 'Sesión expirada. Por favor, inicia sesión nuevamente.';
+        // No mostrar Toast de error, solo establecer estado vacío
+        // El UI mostrará "📊 Sin tiradas activas" automáticamente
+        return;
       }
       
-      Toast.show({
-        type: 'error',
-        text1: 'Error',
-        text2: errorMessage,
-        position: 'top',
-        topOffset: 60,
-      });
+      // Para error 401, mostrar mensaje de sesión expirada
+      if (error.response?.status === 401) {
+        Toast.show({
+          type: 'error',
+          text1: 'Error',
+          text2: 'Sesión expirada. Por favor, inicia sesión nuevamente.',
+          position: 'top',
+          topOffset: 60,
+        });
+      }
+      // Para otros errores, no mostrar Toast, solo establecer estado vacío
+      // El UI mostrará "📊 Sin tiradas activas" automáticamente
     } finally {
       setIsLoadingThrows(false);
     }
@@ -1473,9 +1471,8 @@ const RegistrarApuesta: React.FC = () => {
 
                         moveDetails.push({
                           number: first,
-                          secondNumber: second,
+                          secondNumber: second || null,
                           amount: baseAmount,
-                          profit: 0,
                         });
                       }
                     });
@@ -1490,9 +1487,8 @@ const RegistrarApuesta: React.FC = () => {
 
                       moveDetails.push({
                         number: formattedNumber,
-                        secondNumber: '',
+                        secondNumber: null,
                         amount,
-                        profit: 0,
                       });
                     });
                   }
@@ -1720,7 +1716,7 @@ const RegistrarApuesta: React.FC = () => {
                 ) : (
                   <View style={styles.noThrowContainer}>
                     <Text style={styles.noThrowText}>
-                      {isLoadingThrows ? '🔄 Cargando...' : '📊 Sin tiradas'}
+                      {isLoadingThrows ? '🔄 Cargando...' : '📊 Sin tiradas activas'}
                     </Text>
                   </View>
                 )}
@@ -1922,55 +1918,78 @@ const RegistrarApuesta: React.FC = () => {
                         </View>
                       </View>
                       
-                      {/* Mostrar números */}
-                      <View style={styles.playNumbers}>
-                        <Text style={styles.playNumbersLabel}>Números:</Text>
-                        <View style={styles.playNumbersList}>
-                          {play.numbers.split('\n').filter(num => num.trim() !== '').map((number, idx) => (
-                            <View key={idx} style={styles.playNumberBadge}>
-                              <Text style={styles.playNumberText}>{formatNumberDisplay(number)}</Text>
-                </View>
-              ))}
-            </View>
-          </View>
-
-                      {/* Mostrar detalles por tipo */}
-                      {play.validPlays.map((validPlay, idx) => (
-                        <View key={idx} style={styles.playTypeDetailsContainer}>
-                          <View style={styles.playTypeDetails}>
-                          <Text style={[styles.playTypeName, { color: PLAY_TYPE_COLORS[validPlay.type] || colors.primaryGold }]}>
-                            {validPlay.type}:
-                          </Text>
-                          <Text style={styles.playTypeInfo}>
-                            {validPlay.type === 'Parlet' 
-                              ? `${validPlay.combinations.length} combinaciones`
-                              : `${validPlay.combinations.length} números`
-                            }
-                          </Text>
-                          <Text style={styles.playTypeAmount}>
-                            ${formatAmount(validPlay.totalCost)} USD
-                          </Text>
-                          </View>
-                          
-                          {/* Mostrar combinaciones específicas para Parlet */}
-                          {validPlay.type === 'Parlet' && validPlay.combinations && validPlay.combinations.length > 0 && (
-                            <View style={styles.parletCombinationsContainer}>
-                              <Text style={styles.parletCombinationsLabel}>🎰 Combinaciones:</Text>
-                              <View style={styles.parletCombinationsList}>
-                                {validPlay.combinations.map((combination, comboIdx) => (
-                                  <View key={comboIdx} style={styles.parletCombinationBadge}>
-                                    <Text style={styles.parletCombinationText}>{combination}</Text>
-                                  </View>
-                                ))}
+                      {/* Mostrar números con montos individuales */}
+                      <View style={styles.playNumbersContainer}>
+                        {play.numbers.split('\n').filter(num => num.trim() !== '').map((number, idx) => {
+                          const numberDisplay = formatNumberDisplay(number);
+                          return (
+                            <View key={idx} style={styles.playNumberRow}>
+                              <Text style={styles.playNumberText}>{numberDisplay}</Text>
+                              <View style={styles.playAmountButtons}>
+                                {play.validPlays.map((validPlay, typeIdx) => {
+                                  const typeAmounts = play.typeAmountInputs?.[validPlay.type] || '';
+                                  const amountLines = typeAmounts.split('\n').filter(line => line.trim() !== '');
+                                  
+                                  let amount = '';
+                                  if (validPlay.type === 'Parlet') {
+                                    // Para Parlet, usar el primer monto (monto base)
+                                    amount = amountLines.length > 0 ? amountLines[0] : '';
+                                  } else {
+                                    // Para otros tipos, usar el monto correspondiente al índice del número
+                                    amount = amountLines.length === 1 
+                                      ? amountLines[0] // Si hay un solo monto, aplicarlo a todos
+                                      : (amountLines[idx] || '');
+                                  }
+                                  
+                                  if (!amount || parseFloat(amount) === 0) return null;
+                                  
+                                  return (
+                                    <View
+                                      key={typeIdx}
+                                      style={[
+                                        styles.playAmountButton,
+                                        { backgroundColor: PLAY_TYPE_COLORS[validPlay.type] || colors.primaryGold },
+                                      ]}
+                                    >
+                                      <Text style={styles.playAmountButtonText}>
+                                        {validPlay.type}: ${formatAmount(parseFloat(amount))}
+                                      </Text>
+                                    </View>
+                                  );
+                                })}
                               </View>
                             </View>
-                          )}
-    </View>
-                      ))}
-                      
-                      <Text style={styles.playTotal}>
-                        Total: ${formatAmount(play.amount)} USD
-            </Text>
+                          );
+                        })}
+                      </View>
+
+                      {/* Resumen por tipo de juego */}
+                      <View style={styles.playSummaryContainer}>
+                        {play.validPlays.map((validPlay, idx) => {
+                          const typeAmounts = play.typeAmountInputs?.[validPlay.type] || '';
+                          const amountLines = typeAmounts.split('\n').filter(line => line.trim() !== '' && parseFloat(line) > 0);
+                          const totalByType = validPlay.totalCost;
+                          const count = validPlay.type === 'Parlet' 
+                            ? validPlay.combinations.length 
+                            : validPlay.combinations.length;
+                          
+                          return (
+                            <Text key={idx} style={styles.playSummaryText}>
+                              <Text style={[styles.playSummaryType, { color: PLAY_TYPE_COLORS[validPlay.type] || colors.primaryGold }]}>
+                                {validPlay.type}:
+                              </Text>
+                              {' '}
+                              {validPlay.type === 'Parlet' 
+                                ? `${count} combinaciones = $${formatAmount(totalByType)} USD`
+                                : `${count} números = $${formatAmount(totalByType)} USD`
+                              }
+                            </Text>
+                          );
+                        })}
+                        <Text style={styles.playTotal}>
+                          Total: ${formatAmount(play.amount)} USD
+                        </Text>
+                      </View>
                     </View>
                   </View>
                 ))}
@@ -2311,10 +2330,60 @@ const styles = StyleSheet.create({
     borderColor: `${colors.primaryGold}40`,
   },
   playNumberText: {
-    fontSize: fontSize.xs,
+    fontSize: fontSize.md,
     fontWeight: fontWeight.heavy,
     color: colors.primaryGold,
     fontFamily: 'monospace',
+    minWidth: 40,
+  },
+  playNumbersContainer: {
+    marginBottom: spacing.md,
+    gap: spacing.sm,
+  },
+  playNumberRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: borderRadius.sm,
+    borderWidth: 1,
+    borderColor: `${colors.primaryGold}20`,
+  },
+  playAmountButtons: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.xs,
+    flex: 1,
+  },
+  playAmountButton: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.sm,
+    minHeight: 28,
+    justifyContent: 'center',
+  },
+  playAmountButtonText: {
+    fontSize: fontSize.xs,
+    fontWeight: fontWeight.bold,
+    color: 'white',
+  },
+  playSummaryContainer: {
+    marginTop: spacing.sm,
+    paddingTop: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: `${colors.primaryGold}20`,
+    gap: spacing.xs,
+  },
+  playSummaryText: {
+    fontSize: fontSize.xs,
+    fontWeight: fontWeight.medium,
+    color: colors.lightText,
+  },
+  playSummaryType: {
+    fontSize: fontSize.xs,
+    fontWeight: fontWeight.bold,
   },
   playTypeDetailsContainer: {
     marginBottom: spacing.sm,
@@ -2367,10 +2436,10 @@ const styles = StyleSheet.create({
     color: colors.primaryGold,
   },
   playTotal: {
-    fontSize: fontSize.xs,
+    fontSize: fontSize.sm,
     fontWeight: fontWeight.bold,
     color: colors.primaryGold,
-    textAlign: 'center',
+    textAlign: 'left',
     marginTop: spacing.xs,
   },
   typesGrid: {
