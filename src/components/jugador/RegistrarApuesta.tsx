@@ -1919,49 +1919,81 @@ const RegistrarApuesta: React.FC = () => {
                       </View>
                       
                       {/* Mostrar números con montos individuales */}
-                      <View style={styles.playNumbersContainer}>
-                        {play.numbers.split('\n').filter(num => num.trim() !== '').map((number, idx) => {
-                          const numberDisplay = formatNumberDisplay(number);
-                          return (
-                            <View key={idx} style={styles.playNumberRow}>
-                              <Text style={styles.playNumberText}>{numberDisplay}</Text>
-                              <View style={styles.playAmountButtons}>
-                                {play.validPlays.map((validPlay, typeIdx) => {
-                                  const typeAmounts = play.typeAmountInputs?.[validPlay.type] || '';
-                                  const amountLines = typeAmounts.split('\n').filter(line => line.trim() !== '');
-                                  
-                                  let amount = '';
-                                  if (validPlay.type === 'Parlet') {
-                                    // Para Parlet, usar el primer monto (monto base)
-                                    amount = amountLines.length > 0 ? amountLines[0] : '';
-                                  } else {
-                                    // Para otros tipos, usar el monto correspondiente al índice del número
+                      {play.validPlays.some(validPlay => validPlay.type !== 'Parlet') && (
+                        <View style={styles.playNumbersContainer}>
+                          {play.numbers.split('\n').filter(num => num.trim() !== '').map((number, idx) => {
+                            const numberDisplay = formatNumberDisplay(number);
+                            return (
+                              <View key={idx} style={styles.playNumberRow}>
+                                <Text style={styles.playNumberText}>{numberDisplay}</Text>
+                                <View style={styles.playAmountButtons}>
+                                  {play.validPlays.map((validPlay, typeIdx) => {
+                                    if (validPlay.type === 'Parlet') {
+                                      return null;
+                                    }
+                                    const typeAmounts = play.typeAmountInputs?.[validPlay.type] || '';
+                                    const amountLines = typeAmounts.split('\n').filter(line => line.trim() !== '');
+                                    
+                                    let amount = '';
                                     amount = amountLines.length === 1 
                                       ? amountLines[0] // Si hay un solo monto, aplicarlo a todos
                                       : (amountLines[idx] || '');
-                                  }
-                                  
-                                  if (!amount || parseFloat(amount) === 0) return null;
-                                  
-                                  return (
-                                    <View
-                                      key={typeIdx}
-                                      style={[
-                                        styles.playAmountButton,
-                                        { backgroundColor: PLAY_TYPE_COLORS[validPlay.type] || colors.primaryGold },
-                                      ]}
-                                    >
-                                      <Text style={styles.playAmountButtonText}>
-                                        {validPlay.type}: ${formatAmount(parseFloat(amount))}
-                                      </Text>
+                                    
+                                    if (!amount || parseFloat(amount) === 0) return null;
+                                    
+                                    return (
+                                      <View
+                                        key={typeIdx}
+                                        style={[
+                                          styles.playAmountButton,
+                                          { backgroundColor: PLAY_TYPE_COLORS[validPlay.type] || colors.primaryGold },
+                                        ]}
+                                      >
+                                        <Text style={styles.playAmountButtonText}>
+                                          {validPlay.type}: ${formatAmount(parseFloat(amount))}
+                                        </Text>
+                                      </View>
+                                    );
+                                  })}
+                                </View>
+                              </View>
+                            );
+                          })}
+                        </View>
+                      )}
+
+                      {/* Información específica de Parlet */}
+                      {play.validPlays
+                        .filter(validPlay => validPlay.type === 'Parlet')
+                        .map((validPlay, idx) => {
+                          const typeAmounts = play.typeAmountInputs?.[validPlay.type] || '';
+                          const amountLines = typeAmounts.split('\n').filter(line => line.trim() !== '');
+                          const baseAmount = amountLines.length > 0 ? parseFloat(amountLines[0]) || 0 : 0;
+
+                          if (validPlay.combinations.length === 0) return null;
+
+                          return (
+                            <View key={`parlet-${idx}`} style={styles.parletSummaryContainer}>
+                              <Text style={styles.parletSummaryText}>
+                                <Text style={[styles.playSummaryType, { color: PLAY_TYPE_COLORS[validPlay.type] || colors.primaryGold }]}>
+                                  Parlet:
+                                </Text>
+                                {' '}
+                                ${formatAmount(baseAmount)} c/u
+                              </Text>
+                              <View style={styles.parletCombinationsContainer}>
+                                <Text style={styles.parletCombinationsLabel}>Combinaciones</Text>
+                                <View style={styles.parletCombinationsList}>
+                                  {validPlay.combinations.map((combo, comboIdx) => (
+                                    <View key={`${combo}-${comboIdx}`} style={styles.parletCombinationBadge}>
+                                      <Text style={styles.parletCombinationText}>{combo}</Text>
                                     </View>
-                                  );
-                                })}
+                                  ))}
+                                </View>
                               </View>
                             </View>
                           );
                         })}
-                      </View>
 
                       {/* Resumen por tipo de juego */}
                       <View style={styles.playSummaryContainer}>
@@ -1974,16 +2006,31 @@ const RegistrarApuesta: React.FC = () => {
                             : validPlay.combinations.length;
                           
                           return (
-                            <Text key={idx} style={styles.playSummaryText}>
-                              <Text style={[styles.playSummaryType, { color: PLAY_TYPE_COLORS[validPlay.type] || colors.primaryGold }]}>
-                                {validPlay.type}:
+                            <View key={idx} style={{ width: '100%' }}>
+                              <Text style={styles.playSummaryText}>
+                                <Text style={[styles.playSummaryType, { color: PLAY_TYPE_COLORS[validPlay.type] || colors.primaryGold }]}>
+                                  {validPlay.type}:
+                                </Text>
+                                {' '}
+                                {validPlay.type === 'Parlet' 
+                                  ? `${count} combinaciones = $${formatAmount(totalByType)} USD`
+                                  : `${count} números = $${formatAmount(totalByType)} USD`
+                                }
                               </Text>
-                              {' '}
-                              {validPlay.type === 'Parlet' 
-                                ? `${count} combinaciones = $${formatAmount(totalByType)} USD`
-                                : `${count} números = $${formatAmount(totalByType)} USD`
-                              }
-                            </Text>
+
+                              {validPlay.type === 'Parlet' && validPlay.combinations.length > 0 && (
+                                <View style={styles.parletCombinationsContainer}>
+                                  <Text style={styles.parletCombinationsLabel}>Combinaciones</Text>
+                                  <View style={styles.parletCombinationsList}>
+                                    {validPlay.combinations.map((combo, comboIdx) => (
+                                      <View key={`${combo}-${comboIdx}`} style={styles.parletCombinationBadge}>
+                                        <Text style={styles.parletCombinationText}>{combo}</Text>
+                                      </View>
+                                    ))}
+                                  </View>
+                                </View>
+                              )}
+                            </View>
                           );
                         })}
                         <Text style={styles.playTotal}>
@@ -2420,6 +2467,22 @@ const styles = StyleSheet.create({
     fontWeight: fontWeight.bold,
     color: 'white',
     fontFamily: 'monospace',
+  },
+  parletSummaryContainer: {
+    marginTop: spacing.xs,
+    marginBottom: spacing.sm,
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    backgroundColor: 'rgba(220, 38, 38, 0.08)',
+    borderRadius: borderRadius.sm,
+    borderWidth: 1,
+    borderColor: `${colors.primaryRed}40`,
+  },
+  parletSummaryText: {
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.bold,
+    color: colors.primaryGold,
+    marginBottom: spacing.xs,
   },
   playTypeName: {
     fontSize: fontSize.xs,
