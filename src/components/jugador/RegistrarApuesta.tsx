@@ -2006,31 +2006,16 @@ const RegistrarApuesta: React.FC = () => {
                             : validPlay.combinations.length;
                           
                           return (
-                            <View key={idx} style={{ width: '100%' }}>
-                              <Text style={styles.playSummaryText}>
-                                <Text style={[styles.playSummaryType, { color: PLAY_TYPE_COLORS[validPlay.type] || colors.primaryGold }]}>
-                                  {validPlay.type}:
-                                </Text>
-                                {' '}
-                                {validPlay.type === 'Parlet' 
-                                  ? `${count} combinaciones = $${formatAmount(totalByType)} USD`
-                                  : `${count} números = $${formatAmount(totalByType)} USD`
-                                }
+                            <Text key={idx} style={styles.playSummaryText}>
+                              <Text style={[styles.playSummaryType, { color: PLAY_TYPE_COLORS[validPlay.type] || colors.primaryGold }]}>
+                                {validPlay.type}:
                               </Text>
-
-                              {validPlay.type === 'Parlet' && validPlay.combinations.length > 0 && (
-                                <View style={styles.parletCombinationsContainer}>
-                                  <Text style={styles.parletCombinationsLabel}>Combinaciones</Text>
-                                  <View style={styles.parletCombinationsList}>
-                                    {validPlay.combinations.map((combo, comboIdx) => (
-                                      <View key={`${combo}-${comboIdx}`} style={styles.parletCombinationBadge}>
-                                        <Text style={styles.parletCombinationText}>{combo}</Text>
-                                      </View>
-                                    ))}
-                                  </View>
-                                </View>
-                              )}
-                            </View>
+                              {' '}
+                              {validPlay.type === 'Parlet' 
+                                ? `${count} combinaciones = $${formatAmount(totalByType)} USD`
+                                : `${count} números = $${formatAmount(totalByType)} USD`
+                              }
+                            </Text>
                           );
                         })}
                         <Text style={styles.playTotal}>

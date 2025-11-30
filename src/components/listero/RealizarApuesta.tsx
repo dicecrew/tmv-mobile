@@ -2234,31 +2234,16 @@ const PlayerBetForm: React.FC<PlayerBetFormProps> = ({ player, onBack, bookieId 
                                 : validPlay.combinations.length;
                               
                               return (
-                                <View key={`${validPlay.type}-${idx}`} style={{ width: '100%' }}>
-                                  <Text style={formStyles.playSummaryText}>
-                                    <Text style={[formStyles.playSummaryType, { color: PLAY_TYPE_COLORS[validPlay.type] || colors.primaryGold }]}>
-                                      {validPlay.type}:
-                                    </Text>
-                                    {' '}
-                                    {validPlay.type === 'Parlet' 
-                                      ? `${count} combinaciones = $${formatAmount(totalByType)} USD`
-                                      : `${count} números = $${formatAmount(totalByType)} USD`
-                                    }
+                                <Text key={`${validPlay.type}-${idx}`} style={formStyles.playSummaryText}>
+                                  <Text style={[formStyles.playSummaryType, { color: PLAY_TYPE_COLORS[validPlay.type] || colors.primaryGold }]}>
+                                    {validPlay.type}:
                                   </Text>
-
-                                  {validPlay.type === 'Parlet' && validPlay.combinations.length > 0 && (
-                                    <View style={formStyles.parletCombinationsContainer}>
-                                      <Text style={formStyles.parletCombinationsLabel}>Combinaciones</Text>
-                                      <View style={formStyles.parletCombinationsList}>
-                                        {validPlay.combinations.map((combo, comboIdx) => (
-                                          <View key={`${combo}-${comboIdx}`} style={formStyles.parletCombinationBadge}>
-                                            <Text style={formStyles.parletCombinationText}>{combo}</Text>
-                                          </View>
-                                        ))}
-                                      </View>
-                                    </View>
-                                  )}
-                                </View>
+                                  {' '}
+                                  {validPlay.type === 'Parlet' 
+                                    ? `${count} combinaciones = $${formatAmount(totalByType)} USD`
+                                    : `${count} números = $${formatAmount(totalByType)} USD`
+                                  }
+                                </Text>
                               );
                             })}
                             <Text style={formStyles.playTotal}>

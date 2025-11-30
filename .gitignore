@@ -103,3 +103,8 @@ expo-env.d.ts
 
 # Proyecto Web (no incluir en el repositorio móvil)
 ../tmv_front/
+
+# Google Play Service Account (credenciales sensibles)
+the-money-vice-e91a333317bf.json
+*-service-account.json
+*service-account*.json

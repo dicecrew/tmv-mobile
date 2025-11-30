@@ -34,6 +34,10 @@
         "appleId": "rqg012790@gmail.com",
         "ascAppId": "6755308349",
         "appleTeamId": "AWJXDVX6R2"
+      },
+      "android": {
+        "serviceAccountKeyPath": "./the-money-vice-e91a333317bf.json",
+        "track": "production"
       }
     }
   }

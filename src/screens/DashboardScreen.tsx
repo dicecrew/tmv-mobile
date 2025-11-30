@@ -170,16 +170,19 @@ const DashboardScreen = ({ navigation }: any) => {
               <Text style={styles.dropdownText}>Editar Perfil</Text>
             </TouchableOpacity>
             
-            <TouchableOpacity
-              style={styles.dropdownItem}
-              onPress={() => {
-                setShowDropdown(false);
-                // Navigate to change password
-              }}
-            >
-              <Ionicons name="key-outline" size={20} color={colors.lightText} />
-              <Text style={styles.dropdownText}>Cambiar Contraseña</Text>
-            </TouchableOpacity>
+            {/* Ocultar opción de cambiar contraseña para bookie/listero */}
+            {user && !['bookie', 'listero'].includes(user.roleName?.toLowerCase() || '') && (
+              <TouchableOpacity
+                style={styles.dropdownItem}
+                onPress={() => {
+                  setShowDropdown(false);
+                  // Navigate to change password
+                }}
+              >
+                <Ionicons name="key-outline" size={20} color={colors.lightText} />
+                <Text style={styles.dropdownText}>Cambiar Contraseña</Text>
+              </TouchableOpacity>
+            )}
             
             <View style={styles.dropdownDivider} />
             

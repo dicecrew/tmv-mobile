@@ -2,7 +2,7 @@ export default {
   expo: {
     name: 'TMV Mobile',
     slug: 'tmv-mobile',
-    version: '1.0.2',
+    version: '1.0.4',
     orientation: 'portrait',
     icon: './assets/icon.png',
     userInterfaceStyle: 'dark',
@@ -17,6 +17,7 @@ export default {
     ios: {
       supportsTablet: true,
       bundleIdentifier: 'com.tmv.mobile',
+      buildNumber: '4',
       icon: './assets/icon.png',
       infoPlist: {
         ITSAppUsesNonExemptEncryption: false
@@ -28,6 +29,7 @@ export default {
         backgroundColor: '#1A1A1A'
       },
       package: 'com.tmv.mobile',
+      versionCode: 4,
       icon: './assets/icon.png'
     },
     web: {
