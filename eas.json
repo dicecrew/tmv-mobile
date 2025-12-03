@@ -26,6 +26,19 @@
       "env": {
         "EXPO_PUBLIC_API_URL": "https://api.themoneyvice.com"
       }
+    },
+    "production-apk": {
+      "distribution": "store",
+      "node": "20.19.4",
+      "ios": {
+        "simulator": false
+      },
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://api.themoneyvice.com"
+      }
     }
   },
   "submit": {

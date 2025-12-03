@@ -375,6 +375,22 @@ const VerHistorial: React.FC = () => {
     }
   };
 
+  // Traducir estado al español
+  const getBetStatus = (stateCode: string): string => {
+    const statusMap: { [key: string]: string } = {
+      WON: 'Ganada',
+      LOST: 'Perdida',
+      PENDING: 'Pendiente',
+      CANCELLED: 'Cancelada',
+      ACTIVE: 'Activa',
+      PAID: 'Pagada',
+      APPROVED: 'Aprobada',
+      Approved: 'Aprobada',
+      New: 'Nueva',
+    };
+    return statusMap[stateCode] || stateCode;
+  };
+
   // Resumen de BetResume
   const getBetResumeSummary = (betResume: BetResume) => {
     if (betResume.summary) {
@@ -759,7 +775,7 @@ const VerHistorial: React.FC = () => {
                                     ]}
                                   >
                                     <Text style={styles.statusText}>
-                                      {getStatusIcon(bet.stateCode)} {bet.stateCode}
+                                      {getStatusIcon(bet.stateCode)} {getBetStatus(bet.stateCode)}
                                     </Text>
                                   </View>
                                 </View>

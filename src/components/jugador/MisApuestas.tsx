@@ -17,6 +17,33 @@ import Toast from 'react-native-toast-message';
 import { betService } from '../../api/services';
 import { useAuth } from '../../contexts/AuthContext';
 
+interface ThrowResult {
+  id: string;
+  throwId: string;
+  throwName: string;
+  date: string;
+  centena: string;
+  corrido1: string;
+  corrido2: string;
+  totalProfit: number;
+  totalRevenue: number;
+  createdAt: string;
+  updatedAt: string | null;
+}
+
+interface BetResume {
+  id: string;
+  date: string;
+  lotteryName: string;
+  throwName: string;
+  completed: boolean;
+  revenue: number;
+  bets: Bet[];
+  throwResult?: ThrowResult | null;
+  throwEndTime?: string | null;
+  throwId?: string;
+}
+
 interface Bet {
   id: string;
   date: string;
@@ -47,7 +74,7 @@ interface Move {
 }
 
 interface DateGroup {
-  [dateKey: string]: Bet[];
+  [dateKey: string]: BetResume[];
 }
 
 const MisApuestas: React.FC = () => {
@@ -63,7 +90,7 @@ const MisApuestas: React.FC = () => {
   const [fromDate, setFromDate] = useState(getSevenDaysAgo());
   const [toDate, setToDate] = useState(new Date());
   const [showHistory, setShowHistory] = useState(false);
-  const [bets, setBets] = useState<Bet[]>([]);
+  const [betResumes, setBetResumes] = useState<BetResume[]>([]);
   const [expandedDate, setExpandedDate] = useState<string | null>(null);
   const [expandedBets, setExpandedBets] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(false);
@@ -88,39 +115,47 @@ const MisApuestas: React.FC = () => {
 
       const response = await betService.getUserBetsRange(params);
 
-      // Procesar respuesta para aplanar estructura
-      const flattenedBets: Bet[] = [];
+      // Procesar respuesta manteniendo estructura de betResume
+      const processedBetResumes: BetResume[] = [];
       const apiData = response?.data || response;
 
       if (apiData && apiData.lotteries) {
         apiData.lotteries.forEach((lottery: any) => {
           lottery.throws?.forEach((throwData: any) => {
             throwData.betResumes?.forEach((betResume: any) => {
-              betResume.bets?.forEach((bet: any) => {
-                flattenedBets.push({
-                  ...bet,
-                  lotteryName: lottery.lotteryName,
-                  throwName: throwData.throwName,
+              const bets: Bet[] = [];
+              
+              // Procesar bets del betResume
+              if (betResume.bets && Array.isArray(betResume.bets)) {
+                betResume.bets.forEach((bet: any) => {
+                  bets.push({
+                    ...bet,
+                    lotteryName: lottery.lotteryName,
+                    throwName: throwData.throwName,
+                  });
                 });
+              }
+
+              processedBetResumes.push({
+                id: betResume.id,
+                date: betResume.date,
+                lotteryName: lottery.lotteryName,
+                throwName: throwData.throwName,
+                completed: betResume.completed || false,
+                revenue: betResume.revenue || 0,
+                bets: bets,
+                throwResult: betResume.throwResult || null,
+                throwEndTime: throwData.endTime || null,
+                throwId: throwData.id,
               });
             });
           });
         });
       } else {
         console.warn('⚠️ Estructura de respuesta inesperada:', apiData);
-        // Intentar procesar como array directo de apuestas
-        if (Array.isArray(apiData)) {
-          apiData.forEach((bet: any) => {
-            flattenedBets.push({
-              ...bet,
-              lotteryName: bet.lotteryName || 'Lotería desconocida',
-              throwName: bet.throwName || 'Tirada desconocida',
-          });
-        });
-        }
       }
 
-      setBets(flattenedBets);
+      setBetResumes(processedBetResumes);
       setShowHistory(true);
       setShowFilters(false); // Ocultar filtros después de buscar
     } catch (error) {
@@ -143,18 +178,36 @@ const MisApuestas: React.FC = () => {
     setToDate(dateTo);
   };
 
-  // Agrupar apuestas por fecha
-  const groupedBets: DateGroup = useMemo(() => {
+  // Convertir fecha UTC a fecha local (solo fecha, sin hora)
+  const getLocalDateKey = (utcDateString: string): string => {
+    try {
+      const utcDate = new Date(utcDateString);
+      if (isNaN(utcDate.getTime())) {
+        return utcDateString.split('T')[0]; // Fallback si no se puede parsear
+      }
+      // Obtener año, mes y día en hora local
+      const year = utcDate.getFullYear();
+      const month = String(utcDate.getMonth() + 1).padStart(2, '0');
+      const day = String(utcDate.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    } catch (error) {
+      console.error('Error convirtiendo fecha UTC a local:', error);
+      return utcDateString.split('T')[0];
+    }
+  };
+
+  // Agrupar betResumes por fecha (convertida a local)
+  const groupedBetResumes: DateGroup = useMemo(() => {
     const grouped: DateGroup = {};
 
-    bets.forEach((bet) => {
-      const betDate = new Date(bet.date);
-      const dateKey = betDate.toISOString().split('T')[0];
+    betResumes.forEach((betResume) => {
+      // Convertir fecha UTC a fecha local para agrupación
+      const dateKey = getLocalDateKey(betResume.date);
 
       if (!grouped[dateKey]) {
         grouped[dateKey] = [];
       }
-      grouped[dateKey].push(bet);
+      grouped[dateKey].push(betResume);
     });
 
     // Ordenar fechas descendentemente
@@ -167,40 +220,44 @@ const MisApuestas: React.FC = () => {
     });
 
     return sortedGrouped;
-  }, [bets]);
+  }, [betResumes]);
 
   // Resumen por fecha
-  const getDateSummary = (dateBets: Bet[]) => {
+  const getDateSummary = (dateBetResumes: BetResume[]) => {
     let totalAmount = 0;
     let totalProfit = 0;
     let totalMoves = 0;
     let wonBets = 0;
     let lostBets = 0;
     let pendingBets = 0;
+    let totalBets = 0;
 
-    dateBets.forEach((bet) => {
-      // Contar estados de apuestas
-      switch (bet.stateCode) {
-        case 'WON':
-        case 'Approved':
-        case 'PAID':
-          wonBets++;
-          break;
-        case 'LOST':
-          lostBets++;
-          break;
-        case 'PENDING':
-        case 'ACTIVE':
-        case 'New':
-          pendingBets++;
-          break;
-      }
+    dateBetResumes.forEach((betResume) => {
+      betResume.bets.forEach((bet) => {
+        totalBets++;
+        // Contar estados de apuestas
+        switch (bet.stateCode) {
+          case 'WON':
+          case 'Approved':
+          case 'PAID':
+            wonBets++;
+            break;
+          case 'LOST':
+            lostBets++;
+            break;
+          case 'PENDING':
+          case 'ACTIVE':
+          case 'New':
+            pendingBets++;
+            break;
+        }
 
-      bet.betPlays?.forEach((betPlay) => {
-        betPlay.moves?.forEach((move) => {
-          totalAmount += move.totalAmount || 0;
-          totalProfit += move.profit || 0;
-          totalMoves++;
+        bet.betPlays?.forEach((betPlay) => {
+          betPlay.moves?.forEach((move) => {
+            totalAmount += move.totalAmount || 0;
+            totalProfit += move.profit || 0;
+            totalMoves++;
+          });
         });
       });
     });
@@ -208,7 +265,7 @@ const MisApuestas: React.FC = () => {
     return { 
       totalAmount, 
       totalProfit, 
-      totalBets: dateBets.length,
+      totalBets,
       totalMoves,
       wonBets,
       lostBets,
@@ -237,6 +294,47 @@ const MisApuestas: React.FC = () => {
     }
   };
 
+  // Convertir hora UTC a local
+  const convertUtcTimeToLocal = (utcTimeString: string): string => {
+    if (!utcTimeString) return '';
+    
+    try {
+      let utcDateTime: Date;
+      
+      if (typeof utcTimeString === 'string') {
+        if (utcTimeString.includes('T') && utcTimeString.includes('Z')) {
+          utcDateTime = new Date(utcTimeString);
+        } else if (utcTimeString.includes(':') && !utcTimeString.includes('T')) {
+          const today = new Date().toISOString().split('T')[0];
+          utcDateTime = new Date(`${today}T${utcTimeString}Z`);
+        } else {
+          utcDateTime = new Date(utcTimeString);
+        }
+      } else {
+        utcDateTime = new Date(utcTimeString);
+      }
+      
+      if (isNaN(utcDateTime.getTime())) {
+        console.error('❌ Fecha inválida en convertUtcTimeToLocal:', {
+          utcTimeString,
+          utcDateTime
+        });
+        return utcTimeString;
+      }
+      
+      const hours = utcDateTime.getHours();
+      const minutes = utcDateTime.getMinutes();
+      const seconds = utcDateTime.getSeconds();
+      const ampm = hours >= 12 ? 'p. m.' : 'a. m.';
+      const hours12 = hours % 12 || 12;
+      
+      return `${hours12.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')} ${ampm}`;
+    } catch (error) {
+      console.error('Error converting UTC time to local:', error);
+      return utcTimeString;
+    }
+  };
+
   // Formatear fecha corta para jugadas
   const formatShortDate = (dateString: string): string => {
     try {
@@ -251,6 +349,29 @@ const MisApuestas: React.FC = () => {
       });
     } catch (error) {
       console.error('Error formateando fecha corta:', error);
+      return dateString;
+    }
+  };
+
+  // Formatear fecha y hora completa según imagen (3/12/2025 3:06:15 a.m.)
+  const formatFullDateTime = (dateString: string): string => {
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) {
+        return dateString;
+      }
+      const day = date.getDate();
+      const month = date.getMonth() + 1;
+      const year = date.getFullYear();
+      const hours = date.getHours();
+      const minutes = date.getMinutes();
+      const seconds = date.getSeconds();
+      const ampm = hours >= 12 ? 'p.m.' : 'a.m.';
+      const hours12 = hours % 12 || 12;
+      
+      return `${day}/${month}/${year} ${hours12}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')} ${ampm}`;
+    } catch (error) {
+      console.error('Error formateando fecha y hora completa:', error);
       return dateString;
     }
   };
@@ -387,20 +508,24 @@ const MisApuestas: React.FC = () => {
     setFromDate(getSevenDaysAgo());
     setToDate(new Date());
     setShowHistory(false);
-    setBets([]);
+    setBetResumes([]);
     setExpandedDate(null);
     setExpandedBets(new Set());
   };
     
     // Calcular resúmenes generales
-  const totalJugadas = bets.length;
-  const totalApostado = bets.reduce((total, bet) => {
-    return total + (bet.betPlays?.reduce((playTotal, play) => 
-      playTotal + (play.moves?.reduce((moveTotal, move) => moveTotal + (move.totalAmount || 0), 0) || 0), 0) || 0);
+  const totalJugadas = betResumes.reduce((total, betResume) => total + betResume.bets.length, 0);
+  const totalApostado = betResumes.reduce((total, betResume) => {
+    return total + betResume.bets.reduce((betTotal, bet) => {
+      return betTotal + (bet.betPlays?.reduce((playTotal, play) => 
+        playTotal + (play.moves?.reduce((moveTotal, move) => moveTotal + (move.totalAmount || 0), 0) || 0), 0) || 0);
+    }, 0);
   }, 0);
-  const totalGanado = bets.reduce((total, bet) => {
-    return total + (bet.betPlays?.reduce((playTotal, play) => 
-      playTotal + (play.moves?.reduce((moveTotal, move) => moveTotal + (move.profit || 0), 0) || 0), 0) || 0);
+  const totalGanado = betResumes.reduce((total, betResume) => {
+    return total + betResume.bets.reduce((betTotal, bet) => {
+      return betTotal + (bet.betPlays?.reduce((playTotal, play) => 
+        playTotal + (play.moves?.reduce((moveTotal, move) => moveTotal + (move.profit || 0), 0) || 0), 0) || 0);
+    }, 0);
   }, 0);
     
     return (
@@ -495,7 +620,7 @@ const MisApuestas: React.FC = () => {
               </View>
             )}
             
-            {!isLoading && Object.keys(groupedBets).length === 0 && (
+            {!isLoading && Object.keys(groupedBetResumes).length === 0 && (
               <View style={styles.emptyContainer}>
                 <Ionicons name="receipt-outline" size={64} color={colors.subtleGrey} />
                 <Text style={styles.emptyText}>No hay apuestas en este período</Text>
@@ -503,12 +628,12 @@ const MisApuestas: React.FC = () => {
             )}
 
             <ScrollView style={styles.datesList}>
-              {Object.entries(groupedBets).map(([dateKey, dateBets]) => {
-                const summary = getDateSummary(dateBets);
+              {Object.entries(groupedBetResumes).map(([dateKey, dateBetResumes]) => {
+                const summary = getDateSummary(dateBetResumes);
                 const isExpanded = expandedDate === dateKey;
 
-  return (
-                <View key={dateKey}>
+                return (
+                  <View key={dateKey}>
                   {/* Agrupación por Fecha */}
                   <TouchableOpacity
                     style={styles.dateGroupHeader}
@@ -535,36 +660,38 @@ const MisApuestas: React.FC = () => {
                     </View>
                   </TouchableOpacity>
 
-                  {/* Detalles de Apuestas */}
+                  {/* Detalles de BetResumes */}
                     {isExpanded && (
                     <View style={styles.betsContainer}>
-                        {dateBets.map((bet) => {
-                          const isBetExpanded = expandedBets.has(bet.id);
-                          const totalAmount = bet.betPlays?.reduce((total, play) => 
-                            total + (play.moves?.reduce((moveTotal, move) => moveTotal + (move.totalAmount || 0), 0) || 0), 0) || 0;
-                          const totalProfit = bet.betPlays?.reduce((total, play) => 
-                            total + (play.moves?.reduce((moveTotal, move) => moveTotal + (move.profit || 0), 0) || 0), 0) || 0;
+                        {dateBetResumes.map((betResume) => {
+                          const isBetResumeExpanded = expandedBets.has(betResume.id);
+                          const betResumeTotalAmount = betResume.bets.reduce((total, bet) => 
+                            total + (bet.betPlays?.reduce((playTotal, play) => 
+                              playTotal + (play.moves?.reduce((moveTotal, move) => moveTotal + (move.totalAmount || 0), 0) || 0), 0) || 0), 0);
+                          const betResumeTotalProfit = betResume.bets.reduce((total, bet) => 
+                            total + (bet.betPlays?.reduce((playTotal, play) => 
+                              playTotal + (play.moves?.reduce((moveTotal, move) => moveTotal + (move.profit || 0), 0) || 0), 0) || 0), 0);
 
                           return (
-                        <View key={bet.id} style={styles.betCard}>
-                          {/* Header de la Apuesta */}
+                        <View key={betResume.id} style={styles.betCard}>
+                          {/* Header del BetResume */}
                           <View style={styles.betCardHeader}>
                             {/* Primera línea: Lotería y Estado */}
                             <View style={styles.betCardFirstRow}>
                               <View style={styles.betCardTitleRow}>
                                 <Ionicons name="business-outline" size={14} color={colors.lightText} />
                                 <Text style={styles.betCardTitle}>
-                                  {bet.lotteryName} • {bet.throwName}
+                                  {betResume.lotteryName} • {betResume.throwName}
                                 </Text>
                               </View>
                               <View
                                 style={[
                                   styles.betCardStatus,
-                                  { backgroundColor: getStatusColor(bet.stateCode) }
+                                  { backgroundColor: betResume.throwResult ? getStatusColor('PAID') : getStatusColor('PENDING') }
                                 ]}
                               >
                                 <Text style={styles.betCardStatusText}>
-                                  {getStatusIcon(bet.stateCode)} {getBetStatus(bet)}
+                                  {betResume.throwResult ? '✅ Con resultados' : '⌛ Sin resultados'}
                                 </Text>
                               </View>
                             </View>
@@ -572,97 +699,184 @@ const MisApuestas: React.FC = () => {
                             {/* Segunda línea: Fecha y botón expandir */}
                             <TouchableOpacity
                               style={styles.betCardSecondRow}
-                              onPress={() => toggleExpandBet(bet.id)}
+                              onPress={() => toggleExpandBet(betResume.id)}
                               activeOpacity={0.7}
                             >
-                              <Text style={styles.betCardDate}>
-                                📅 {formatShortDate(bet.date)} • {new Date(bet.date).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', hour12: true })}
-                              </Text>
+                              <View style={styles.betCardDateContainer}>
+                                <Text style={styles.betCardDate}>
+                                  📅 Fecha: {formatFullDateTime(betResume.date)}
+                                </Text>
+                                {betResume.throwEndTime && (
+                                  <Text style={styles.betCardDate}>
+                                    Hora de Cierre: {convertUtcTimeToLocal(betResume.throwEndTime)}
+                                  </Text>
+                                )}
+                                <Text style={styles.betCardStatusLabel}>
+                                  Estado Tirada: {betResume.throwResult ? '✅ Con resultados' : '⌛ Pendiente'}
+                                </Text>
+                              </View>
                               <Ionicons
-                                name={isBetExpanded ? 'chevron-up-circle' : 'chevron-down-circle'}
+                                name={isBetResumeExpanded ? 'chevron-up-circle' : 'chevron-down-circle'}
                                 size={18}
                                 color={colors.primaryGold}
                               />
                             </TouchableOpacity>
                           </View>
 
-                          {/* Detalle de números - Solo visible si está expandido */}
-                          {isBetExpanded && (
+                          {/* Detalle del BetResume - Solo visible si está expandido */}
+                          {isBetResumeExpanded && (
                             <View style={styles.betCardDetails}>
-                              <View style={styles.allNumbersContainer}>
-                                {bet.betPlays?.map((betPlay, betPlayIdx) => (
-                                  <React.Fragment key={betPlayIdx}>
-                                    {(betPlay.moves || []).map((move, moveIdx) => (
-                                      <React.Fragment key={`${betPlayIdx}-${moveIdx}`}>
-                                        {(move.moveDetails || []).map((detail, detailIdx) => {
-                                          const playType = move.playTypeName || betPlay.playTypeName || 'JUGADA';
-                                          const isParlet = playType.toUpperCase() === 'PARLET';
-                                          const numberDisplay = detail.secondNumber 
-                                            ? (isParlet ? `${detail.number}x${detail.secondNumber}` : `${detail.number} - ${detail.secondNumber}`)
-                                            : detail.number;
-                                          
-                                          return (
-                                            <View key={`${betPlayIdx}-${moveIdx}-${detailIdx}`} style={styles.numberRow}>
-                                              <View style={styles.numberInfo}>
-                                                <View
-                                                  style={[
-                                                    styles.miniTypeBadge,
-                                                    { backgroundColor: getBetTypeColor(playType) },
-                                                  ]}
-                                                >
-                                                  <Text style={styles.miniTypeText}>{playType}</Text>
-                                                </View>
-                                                <Text style={styles.numberText}>
-                                                  🎲 {numberDisplay}
-                                                </Text>
-                                              </View>
-                                              <View style={styles.amountInfo}>
-                                                <Text style={styles.numberAmount}>${formatAmount(detail.amount)}</Text>
-                                                {detail.profit !== undefined && detail.profit !== 0 && (
-                                                  <Text
-                                                    style={[
-                                                      styles.numberProfit,
-                                                      detail.profit > 0 ? styles.profitPositive : styles.profitNegative,
-                                                    ]}
-                                                  >
-                                                    {detail.profit > 0 ? '+' : ''}{formatAmount(detail.profit)}
-                                                  </Text>
-                                                )}
-                                              </View>
+                              {/* Información del ThrowResult - Solo mostrar si hay resultados */}
+                              {betResume.throwResult && (
+                                <View style={styles.throwResultContainer}>
+                                  <Text style={styles.throwResultTitle}>Resultados de la Tirada:</Text>
+                                  <View style={styles.throwResultDetails}>
+                                    <Text style={styles.throwResultText}>Centena: {betResume.throwResult.centena}</Text>
+                                    <Text style={styles.throwResultText}>Corrido 1: {betResume.throwResult.corrido1}</Text>
+                                    <Text style={styles.throwResultText}>Corrido 2: {betResume.throwResult.corrido2}</Text>
+                                  </View>
+                                </View>
+                              )}
+
+                              {/* Jugadas del BetResume */}
+                              <View style={styles.jugadasSection}>
+                                <Text style={styles.jugadasTitle}>🎲 JUGADAS</Text>
+                                {betResume.bets.map((bet) => {
+                                  const betKey = `${betResume.id}-${bet.id}`;
+                                  const isBetExpanded = expandedBets.has(betKey);
+                                  const totalAmount = bet.betPlays?.reduce((total, play) => 
+                                    total + (play.moves?.reduce((moveTotal, move) => moveTotal + (move.totalAmount || 0), 0) || 0), 0) || 0;
+                                  const totalProfit = bet.betPlays?.reduce((total, play) => 
+                                    total + (play.moves?.reduce((moveTotal, move) => moveTotal + (move.profit || 0), 0) || 0), 0) || 0;
+
+                                  return (
+                                    <View key={bet.id} style={styles.betItemCard}>
+                                      {/* Header de la Jugada */}
+                                      <TouchableOpacity
+                                        style={styles.betItemHeader}
+                                        onPress={() => toggleExpandBet(betKey)}
+                                        activeOpacity={0.7}
+                                      >
+                                        <View style={styles.betItemHeaderLeft}>
+                                          <View
+                                            style={[
+                                              styles.betItemStatus,
+                                              { backgroundColor: getStatusColor(bet.stateCode) }
+                                            ]}
+                                          >
+                                            <Text style={styles.betItemStatusText}>
+                                              {getStatusIcon(bet.stateCode)} {getBetStatus(bet)}
+                                            </Text>
+                                          </View>
+                                          <Text style={styles.betItemDate}>
+                                            📅 {formatShortDate(bet.date)} • {new Date(bet.date).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', hour12: true })}
+                                          </Text>
+                                        </View>
+                                        <Ionicons
+                                          name={isBetExpanded ? 'chevron-up-circle' : 'chevron-down-circle'}
+                                          size={18}
+                                          color={colors.primaryGold}
+                                        />
+                                      </TouchableOpacity>
+
+                                      {/* Detalle de números - Solo visible si está expandido */}
+                                      {isBetExpanded && (
+                                        <View style={styles.betItemDetails}>
+                                          <ScrollView 
+                                            style={styles.allNumbersContainer}
+                                            nestedScrollEnabled
+                                            showsVerticalScrollIndicator={true}
+                                          >
+                                            <View style={styles.numbersContent}>
+                                              {bet.betPlays?.map((betPlay, betPlayIdx) => (
+                                                <React.Fragment key={betPlayIdx}>
+                                                  {(betPlay.moves || []).map((move, moveIdx) => (
+                                                    <React.Fragment key={`${betPlayIdx}-${moveIdx}`}>
+                                                      {(move.moveDetails || []).map((detail, detailIdx) => {
+                                                        const playType = move.playTypeName || betPlay.playTypeName || 'JUGADA';
+                                                        const isParlet = playType.toUpperCase() === 'PARLET';
+                                                        const numberDisplay = detail.secondNumber 
+                                                          ? (isParlet ? `${detail.number}x${detail.secondNumber}` : `${detail.number} - ${detail.secondNumber}`)
+                                                          : detail.number;
+                                                        
+                                                        return (
+                                                          <View key={`${betPlayIdx}-${moveIdx}-${detailIdx}`} style={styles.numberRow}>
+                                                            <View style={styles.numberInfo}>
+                                                              <View
+                                                                style={[
+                                                                  styles.miniTypeBadge,
+                                                                  { backgroundColor: getBetTypeColor(playType) },
+                                                                ]}
+                                                              >
+                                                                <Text style={styles.miniTypeText}>{playType}</Text>
+                                                              </View>
+                                                              <Text style={styles.numberText}>
+                                                                🎲 {numberDisplay}
+                                                              </Text>
+                                                            </View>
+                                                            <View style={styles.amountInfo}>
+                                                              <Text style={styles.numberAmount}>${formatAmount(detail.amount || 0)}</Text>
+                                                              {detail.profit !== undefined && detail.profit !== 0 && (
+                                                                <Text
+                                                                  style={[
+                                                                    styles.numberProfit,
+                                                                    detail.profit > 0 ? styles.profitPositive : styles.profitNegative,
+                                                                  ]}
+                                                                >
+                                                                  {detail.profit > 0 ? '+' : ''}{formatAmount(detail.profit)}
+                                                                </Text>
+                                                              )}
+                                                            </View>
+                                                          </View>
+                                                        );
+                                                      })}
+                                                    </React.Fragment>
+                                                  ))}
+                                                </React.Fragment>
+                                              ))}
                                             </View>
-                                          );
-                                        })}
-                                      </React.Fragment>
-                                    ))}
-                                  </React.Fragment>
-                                ))}
+                                          </ScrollView>
+
+                                          {/* Resumen de Jugada */}
+                                          <View style={styles.betGainContainer}>
+                                            <Ionicons name="trophy-outline" size={20} color={colors.darkBackground} />
+                                            <Text style={styles.betGainLabel}>Ganancia</Text>
+                                            <Text style={styles.betGainAmount}>
+                                              ${formatAmount(totalProfit)}
+                                            </Text>
+                                          </View>
+                                        </View>
+                                      )}
+                                    </View>
+                                  );
+                                })}
                               </View>
 
-                              {/* Resumen de Apuesta */}
+                              {/* Resumen del BetResume */}
                               <View style={styles.betSummary}>
                                 <View style={styles.betSummaryLeft}>
                                   <Ionicons name="wallet-outline" size={20} color={colors.darkBackground} />
                                   <Text style={styles.betSummaryLabel}>APOSTADO</Text>
                                   <Text style={styles.betSummaryAmount}>
-                                    ${formatAmount(totalAmount)}
+                                    ${formatAmount(betResumeTotalAmount)}
                                   </Text>
                                 </View>
                                 <View style={styles.betSummaryRight}>
                                   <Ionicons name="trophy-outline" size={20} color={colors.darkBackground} />
                                   <Text style={styles.betSummaryLabel}>PREMIO</Text>
                                   <Text style={styles.betSummaryAmount}>
-                                    ${formatAmount(totalProfit)}
+                                    ${formatAmount(betResumeTotalProfit)}
                                   </Text>
                                 </View>
                               </View>
                             </View>
                           )}
-                          </View>
-                        );
-                        })}
-                      </View>
-                    )}
+                        </View>
+                      );
+                    })}
                   </View>
+                    )}
+                </View>
                 );
               })}
             </ScrollView>
@@ -896,7 +1110,7 @@ const styles = StyleSheet.create({
   },
   betCardHeader: {
     padding: spacing.md,
-    gap: spacing.xs,
+    gap: spacing.sm,
   },
   betCardFirstRow: {
     flexDirection: 'row',
@@ -907,7 +1121,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingTop: spacing.xs,
+    paddingTop: spacing.md,
   },
   betCardTitleRow: {
     flexDirection: 'row',
@@ -939,8 +1153,11 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   allNumbersContainer: {
-    gap: spacing.xs,
+    maxHeight: 300,
     marginBottom: spacing.md,
+  },
+  numbersContent: {
+    gap: spacing.xs,
   },
   numberRow: {
     flexDirection: 'row',
@@ -1046,12 +1263,6 @@ const styles = StyleSheet.create({
     fontSize: fontSize.lg,
     fontWeight: fontWeight.heavy,
   },
-  profitPositive: {
-    color: '#22c55e',
-  },
-  profitNegative: {
-    color: '#ef4444',
-  },
   dateProfitLabel: {
     fontSize: fontSize.xs,
     color: colors.subtleGrey,
@@ -1090,6 +1301,9 @@ const styles = StyleSheet.create({
   },
   betItemHeaderLeft: {
     flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
   },
   betLotteryContainer: {
     flexDirection: 'row',
@@ -1307,6 +1521,99 @@ const styles = StyleSheet.create({
     fontSize: fontSize.md,
     fontWeight: fontWeight.heavy,
     color: colors.darkBackground,
+  },
+  betGainContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    marginTop: spacing.sm,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    backgroundColor: '#22c55e',
+    borderRadius: borderRadius.md,
+  },
+  betGainLabel: {
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.bold,
+    color: colors.darkBackground,
+  },
+  betGainAmount: {
+    fontSize: fontSize.md,
+    fontWeight: fontWeight.heavy,
+    color: colors.darkBackground,
+  },
+  throwResultContainer: {
+    backgroundColor: colors.inputBackground,
+    padding: spacing.md,
+    borderRadius: borderRadius.sm,
+    marginBottom: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.inputBorder,
+  },
+  throwResultTitle: {
+    fontSize: fontSize.md,
+    fontWeight: fontWeight.bold,
+    color: colors.primaryGold,
+    marginBottom: spacing.sm,
+  },
+  throwResultDetails: {
+    gap: spacing.xs,
+  },
+  throwResultText: {
+    fontSize: fontSize.sm,
+    color: colors.lightText,
+    fontWeight: fontWeight.medium,
+  },
+  jugadasSection: {
+    marginTop: spacing.md,
+  },
+  jugadasTitle: {
+    fontSize: fontSize.md,
+    fontWeight: fontWeight.bold,
+    color: colors.primaryGold,
+    marginBottom: spacing.md,
+  },
+  betItemCard: {
+    backgroundColor: colors.inputBackground,
+    borderRadius: borderRadius.sm,
+    marginBottom: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.inputBorder,
+    overflow: 'hidden',
+  },
+  betItemDetails: {
+    padding: spacing.md,
+    backgroundColor: colors.darkBackground,
+  },
+  betItemStatus: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.sm,
+  },
+  betItemStatusText: {
+    fontSize: fontSize.xs,
+    fontWeight: fontWeight.bold,
+    color: 'white',
+  },
+  betItemDate: {
+    fontSize: fontSize.xs,
+    color: colors.subtleGrey,
+    flex: 1,
+  },
+  betCardId: {
+    fontSize: fontSize.xs,
+    color: colors.subtleGrey,
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+  },
+  betCardDateContainer: {
+    flex: 1,
+    gap: spacing.xs,
+  },
+  betCardStatusLabel: {
+    fontSize: fontSize.xs,
+    color: colors.subtleGrey,
+    marginTop: spacing.xs,
   },
 });
 
