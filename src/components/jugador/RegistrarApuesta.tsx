@@ -1643,10 +1643,13 @@ const RegistrarApuesta: React.FC = () => {
     <View style={styles.mainContainer}>
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
     >
-      <ScrollView style={styles.scrollView} keyboardShouldPersistTaps="handled">
+      <ScrollView
+        style={styles.scrollView}
+        keyboardShouldPersistTaps="handled"
+        nestedScrollEnabled={true}  // 👈 clave en Android
+        contentContainerStyle={{ paddingBottom: 100 }} // ya lo tenías como padding en el style
+      >
         <Card 
           title="Registrar Apuesta" 
           icon="dice-outline"
