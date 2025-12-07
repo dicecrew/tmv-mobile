@@ -105,7 +105,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user }) => {
       </View>
 
       {/* Content */}
-      <ScrollView style={styles.content}>
+      <ScrollView style={styles.content} nestedScrollEnabled>
         {renderContent()}
       </ScrollView>
     </View>

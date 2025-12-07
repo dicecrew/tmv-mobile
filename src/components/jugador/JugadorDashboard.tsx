@@ -73,7 +73,7 @@ const JugadorDashboard: React.FC = () => {
           {renderContent()}
         </View>
       ) : (
-        <ScrollView style={styles.content}>
+        <ScrollView style={styles.content} nestedScrollEnabled={true}>
           {renderContent()}
         </ScrollView>
       )}

@@ -627,7 +627,7 @@ const MisApuestas: React.FC = () => {
               </View>
             )}
 
-            <ScrollView style={styles.datesList}>
+            <ScrollView style={styles.datesList} nestedScrollEnabled>
               {Object.entries(groupedBetResumes).map(([dateKey, dateBetResumes]) => {
                 const summary = getDateSummary(dateBetResumes);
                 const isExpanded = expandedDate === dateKey;
@@ -785,7 +785,6 @@ const MisApuestas: React.FC = () => {
                                           <ScrollView 
                                             style={styles.allNumbersContainer}
                                             nestedScrollEnabled
-                                            showsVerticalScrollIndicator={true}
                                           >
                                             <View style={styles.numbersContent}>
                                               {bet.betPlays?.map((betPlay, betPlayIdx) => (

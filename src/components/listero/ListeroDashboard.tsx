@@ -78,7 +78,7 @@ const ListeroDashboard: React.FC = () => {
       </View>
 
       {/* Content */}
-      <ScrollView style={styles.content}>
+      <ScrollView style={styles.content} nestedScrollEnabled={true}>
         {renderContent()}
       </ScrollView>
     </View>
